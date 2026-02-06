@@ -11,28 +11,9 @@
 -- |||helplesstags.marks|||
 
 
--- ~/nvim-plugins/tagmarks/lua/tagmarks.lua
 
----@brief [[
---- Tagmarks.nvim - A flexible tag management system for Neovim
----
---- Tagmarks provides a provider-based architecture for defining, referencing,
---- and navigating between tagged locations in your files. Built-in providers
---- include marks (@@@), references (|||), bibliography (/), hashtags (#),
---- inline highlights (~group:text~), and buffer config ($key:value).
----
---- Usage:
----   require("tagmarks").setup({
----     tagfile = vim.fn.stdpath("data") .. "/tagmarks.tags",
----     update_on_save = true,
----     filetypes = nil, -- or { "txt", "md", "norg" }
----   })
----@brief ]]
 
----@class TagmarksConfig
----@field tagfile string Path to the tagfile for persistent storage
----@field update_on_save boolean Whether to update tags on BufWritePost
----@field filetypes string[]|nil Filetypes to track (nil = all)
+
 
 ---@class TagmarkEntry
 ---@field name string The tag name
@@ -59,15 +40,18 @@
 
 local M = {}
 
----@type TagmarksConfig
+---@class TagmarksConfig
+---@field tagfile string Path to the tagfile for persistent storage
+---@field update_on_save boolean Whether to update tags on BufWritePost
+---@field filetypes string[]|nil Filetypes to track (nil = all)
+---
 M.config = {
-    tagfile = vim.fn.stdpath("data") .. "/tagmarks.tags",
+    tagfile = vim.fn.stdpath("data") .. "/tagflux.tags",
     update_on_save = true,
     filetypes = nil,
 }
 
----@type number Namespace for extmarks
-local ns = vim.api.nvim_create_namespace("tagmarks")
+local ns = vim.api.nvim_create_namespace("tagflux")
 
 ---@type table<string, TagmarkProvider> Registered providers
 local providers = {}
@@ -82,7 +66,6 @@ end
 ---Load tags from the tagfile
 ---@param section? string Filter by provider name (nil = all sections)
 ---@return table<string, TagmarkLoadedEntry[]> Map of tag names to their locations
----@private
 local function load_tagfile(section)
     local tags = {}
     if vim.fn.filereadable(M.config.tagfile) == 1 then
@@ -102,7 +85,6 @@ end
 ---@param section string Provider name
 ---@param filepath string Absolute path to the source file
 ---@param new_tags TagmarkEntry[] Tags to save
----@private
 local function save_tagfile(section, filepath, new_tags)
     local lines = {}
 
@@ -142,7 +124,7 @@ M.utils = {
 ---@private
 local function apply_extmarks(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
-    if vim.b[bufnr].tagmarks_disabled then return end
+    if vim.b[bufnr].tagflux_disabled then return end
 
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
 
@@ -243,7 +225,7 @@ local function process_on_enter(bufnr)
     end
 end
 
----Initialize a buffer with tagmarks
+---Initialize a buffer with tagflux
 ---Sets conceal options, processes on_enter hooks, updates tags, and applies extmarks.
 ---@param bufnr? number Buffer number (default: current)
 ---@private
@@ -269,7 +251,7 @@ local function setup_highlights()
     vim.api.nvim_set_hl(0, "TagmarkCfg", { link = "Comment" })
 end
 
----Setup tagmarks with the given options
+---Setup tagflux with the given options
 ---@param opts? TagmarksConfig Configuration options (merged with defaults)
 function M.setup(opts)
     M.config = vim.tbl_deep_extend("force", M.config, opts or {})
@@ -287,7 +269,7 @@ function M.setup(opts)
     -- User commands
     vim.api.nvim_create_user_command("TagmarksUpdate", function()
         M.update_tags(false)
-    end, { desc = "Update tagmarks for current buffer" })
+    end, { desc = "Update tagflux for current buffer" })
 
     vim.api.nvim_create_user_command("TagmarksList", function()
         local tags = load_tagfile()
@@ -305,7 +287,7 @@ function M.setup(opts)
         end
         table.sort(lines)
         vim.notify(#lines > 0 and table.concat(lines, "\n") or "No tags", vim.log.levels.INFO)
-    end, { desc = "List all tagmarks" })
+    end, { desc = "List all tagflux" })
 
     -- Keymaps
     vim.keymap.set("n", "<C-]>", M.jump_to_tag, { desc = "Jump to tagmark under cursor" })
@@ -313,19 +295,19 @@ function M.setup(opts)
     -- Autocommands
     vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
         callback = setup_buffer(),
-        desc = "Initialize tagmarks for buffer",
+        desc = "Initialize tagflux for buffer",
     })
 
     vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
         callback = function() apply_extmarks() end,
-        desc = "Update tagmarks extmarks on text change",
+        desc = "Update tagflux extmarks on text change",
     })
 
     if M.config.update_on_save then
         vim.api.nvim_create_autocmd("BufWritePost", {
             pattern = M.config.filetypes and ("*." .. table.concat(M.config.filetypes, ",*.")) or "*",
             callback = function() M.update_tags(true) end,
-            desc = "Update tagmarks on save",
+            desc = "Update tagflux on save",
         })
     end
 end
