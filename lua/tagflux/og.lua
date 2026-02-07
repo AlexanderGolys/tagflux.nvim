@@ -1,9 +1,4 @@
-
-
-
-
 -- @@@helplesstags.og
--- ~/nvim-plugins/tagmarks/lua/tagmarks/og.lua
 
 ---@brief [[
 --- Hashtag (og) provider for tagmarks
@@ -27,6 +22,7 @@ local PATTERN = "()###(%S+)"
 function M.setup(tagmarks)
   local find_with_comment = tagmarks.utils.find_with_comment
   local gmatch_with_comment = tagmarks.utils.gmatch_with_comment
+  local get_hl_group = tagmarks.utils.get_hl_group
 
   tagmarks.register("og", {
     ---Find a hashtag at the cursor position
@@ -61,7 +57,7 @@ function M.setup(tagmarks)
         -- Highlight #tag
         vim.api.nvim_buf_set_extmark(bufnr, ns, lnum, col0 + 2, {
           end_col = col0 + 3 + #name,
-          hl_group = "TagmarkOg",
+          hl_group = get_hl_group("og"),
         })
       end
     end,

@@ -1,8 +1,4 @@
-
-
 -- @@@helplesstags.hl
-
--- ~/nvim-plugins/tagmarks/lua/tagmarks/hl.lua
 
 ---@brief [[
 --- Inline highlight provider for tagmarks

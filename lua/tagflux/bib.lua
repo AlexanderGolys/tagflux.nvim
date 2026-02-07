@@ -1,7 +1,4 @@
-
-
 -- @@@helplesstags.bib
-
 
 ---@brief [[
 --- Bibliography/link provider for tagmarks
@@ -26,6 +23,7 @@ local PATTERN = "()///(%S+)"
 function M.setup(tagmarks)
   local find_with_comment = tagmarks.utils.find_with_comment
   local gmatch_with_comment = tagmarks.utils.gmatch_with_comment
+  local get_hl_group = tagmarks.utils.get_hl_group
 
   tagmarks.register("bib", {
     ---Find a bibliography reference at the cursor position
@@ -60,7 +58,7 @@ function M.setup(tagmarks)
         -- Highlight /ref
         vim.api.nvim_buf_set_extmark(bufnr, ns, lnum, col0 + 2, {
           end_col = col0 + 3 + #ref,
-          hl_group = "TagmarkBib",
+          hl_group = get_hl_group("bib"),
         })
       end
     end,

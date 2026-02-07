@@ -1,7 +1,4 @@
-
-
 -- @@@helplesstags.cfg
--- ~/nvim-plugins/tagmarks/lua/tagmarks/cfg.lua
 
 ---@brief [[
 --- Buffer configuration provider for tagmarks
@@ -39,7 +36,7 @@ local handlers = {
   ---Disable tagmarks for this buffer
   tagmarks = function(value, bufnr)
     if value == "off" then
-      vim.b[bufnr].tagmarks_disabled = true
+      vim.b[bufnr].tagflux_disabled = true
     end
   end,
 
@@ -56,6 +53,7 @@ local handlers = {
 function M.setup(tagmarks)
   local find_with_comment = tagmarks.utils.find_with_comment
   local gmatch_with_comment = tagmarks.utils.gmatch_with_comment
+  local get_hl_group = tagmarks.utils.get_hl_group
 
   tagmarks.register("cfg", {
     ---Find a config directive at the cursor position
@@ -90,7 +88,7 @@ function M.setup(tagmarks)
         -- Highlight $key:value
         vim.api.nvim_buf_set_extmark(bufnr, ns, lnum, col0 + 2, {
           end_col = col0 + 3 + #key + 1 + #value,
-          hl_group = "TagmarkCfg",
+          hl_group = get_hl_group("cfg"),
         })
       end
     end,
