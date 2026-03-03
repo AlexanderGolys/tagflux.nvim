@@ -52,11 +52,18 @@ function M.register(fluxtags)
     --- we cannot use the generic apply_extmarks path (which uses a fixed hl_group).
     --- Each segment is placed individually to fully hide the syntax and apply the
     --- correct group only to the visible text.
-    function kind:apply_extmarks(bufnr, lnum, line, ns)
+    --- Respects is_disabled to skip highlighting in disabled regions (e.g., fluxtags_hl).
+    function kind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
         local priority = self.priority or 1100
         for match_start, group, text in line:gmatch("()" .. match_pattern) do
             local prefix_start, prefix_text = prefix_util.find_prefix(line, match_start, prefix_patterns)
             local col0       = prefix_start - 1
+            
+            -- Skip if this location is in a disabled region
+            if is_disabled and is_disabled(lnum, col0) then
+                goto continue
+            end
+            
             local open_len   = #prefix_text + #open
             local prefix_len = open_len + #group + #mid
             local text_start = col0 + prefix_len
@@ -93,6 +100,8 @@ function M.register(fluxtags)
                 conceal  = conceal_close,
                 priority = priority,
             })
+            
+            ::continue::
         end
     end
 
