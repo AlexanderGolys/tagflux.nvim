@@ -1,73 +1,67 @@
 --- @brief [[
----     og — hashtag / topic-grouping tags.
+---     refog — references to og hashtag tags.
 ---
----     Syntax: `@##<name>`
----     Unlike marks, the same hashtag name can appear in many files. Pressing
----     Ctrl-] opens a picker listing every occurrence so the user can navigate
----     between all usages of the topic. Falls back to vim.ui.select when
----     Telescope is not available.
----
----     Tags are saved to a tagfile and listed via `:FTagsList og`.
----     The `@##` prefix is concealed to `#` when conceallevel >= 1.
+---     Syntax: `#|#||<name>||`
+---     Unlike `og` tags, refog entries are not persisted to a tagfile and do
+---     not create additional hashtag occurrences. They only resolve and jump to
+---     existing saved `og` entries.
 --- @brief ]]
-
--- @@@fluxtags.og
--- ###tag-kind
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
 
 local M = {}
 
---- Register the `og` tag kind with fluxtags.
+--- Register the `refog` tag kind with fluxtags.
 ---
 --- @param fluxtags table The main fluxtags module table
 function M.register(fluxtags)
-    local cfg       = (fluxtags.config.kinds and fluxtags.config.kinds.og) or {}
-    local kind_name = cfg.name     or "og"
-    local pattern   = cfg.pattern  or "@##([%w_.%-%+%*%/%\\:]+)"
-    local hl_group  = cfg.hl_group or "FluxTagOg"
-    local open      = cfg.open     or "@##"
-    local conceal_open = cfg.conceal_open or "#"
+    local cfg      = (fluxtags.config.kinds and fluxtags.config.kinds.refog) or {}
+    local og_cfg   = (fluxtags.config.kinds and fluxtags.config.kinds.og) or {}
+    local kind_name = cfg.name     or "refog"
+    local pattern   = cfg.pattern  or "#|#||([%w_.%-%+%*%/%\\:]+)||"
+    local hl_group  = cfg.hl_group or "FluxTagRef"
+    local open      = cfg.open     or "#|#||"
+    local close     = cfg.close    or "||"
+    local conceal_open  = cfg.conceal_open  or "#"
+    local conceal_close = cfg.conceal_close or ""
     local prefix_patterns = cfg.comment_prefix_patterns or prefix_util.default_comment_prefix_patterns
+    local og_kind_name  = og_cfg.name or "og"
 
     local kind = tag_kind.new({
         name            = kind_name,
         pattern         = pattern,
         hl_group        = hl_group,
         priority        = cfg.priority,
-        save_to_tagfile = true,
+        save_to_tagfile = false,
 
         is_valid = function(name)
             return name:match("^[%w_.%-%+%*%/%\\:]+$") ~= nil
         end,
 
-        --- Conceal optional comment prefix + `@##` to `#`.
         conceal_pattern = function(name)
             return {
-                { offset = 0,     length = #open, char = conceal_open },
-                { offset = #open, length = #name, hl_group = hl_group },
+                { offset = 0,             length = #open,  char = conceal_open },
+                { offset = #open,         length = #name,  hl_group = hl_group },
+                { offset = #open + #name, length = #close, char = conceal_close },
             }
         end,
 
-        --- Open a picker showing all occurrences of the hashtag.
-        --- Uses Telescope when available, falls back to vim.ui.select.
         on_jump = function(name, ctx)
-            local tags    = ctx.utils.load_tagfile(ctx.kind_name)
+            local tags = ctx.utils.load_tagfile(og_kind_name)
             local entries = tags[name]
-
             if not entries or #entries == 0 then
-                vim.notify("No tags found: #" .. name, vim.log.levels.WARN)
+                vim.notify("No og tags found: #" .. name, vim.log.levels.WARN)
                 return true
             end
 
             local ok_telescope, telescope = pcall(require, "telescope.pickers")
             if ok_telescope then
-                local finders     = require("telescope.finders")
-                local conf        = require("telescope.config").values
-                local actions     = require("telescope.actions")
+                local finders      = require("telescope.finders")
+                local conf         = require("telescope.config").values
+                local actions      = require("telescope.actions")
                 local action_state = require("telescope.actions.state")
-                local previewers  = require("telescope.previewers")
+                local previewers   = require("telescope.previewers")
 
                 telescope.new({}, {
                     prompt_title = "#" .. name,
@@ -75,7 +69,7 @@ function M.register(fluxtags)
                         results = entries,
                         entry_maker = function(entry)
                             return {
-                                value   = entry,
+                                value = entry,
                                 display = string.format("%s:%d", vim.fn.fnamemodify(entry.file, ":~:."), entry.lnum),
                                 ordinal = entry.file .. entry.lnum,
                             }
@@ -115,6 +109,7 @@ function M.register(fluxtags)
                     end
                 end)
             end
+
             return true
         end,
     })
@@ -152,26 +147,15 @@ function M.register(fluxtags)
                 hl_group = self.hl_group,
                 priority = priority,
             })
+            pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len + #name, {
+                end_col  = col0 + open_len + #name + #close,
+                conceal  = conceal_close,
+                hl_group = self.hl_group,
+                priority = priority,
+            })
 
             ::continue::
         end
-    end
-
-    --- Override collect_tags to record the column of each match so the picker
-    --- can position the cursor precisely on the hashtag, not just the line start.
-    function kind:collect_tags(filepath, lines)
-        local tags = {}
-        for lnum, line in ipairs(lines) do
-            for match_start, name in line:gmatch("()" .. pattern) do
-                table.insert(tags, {
-                    name = name,
-                    file = filepath,
-                    lnum = lnum,
-                    col  = match_start + #open,
-                })
-            end
-        end
-        return tags
     end
 
     fluxtags.register_kind(kind)
