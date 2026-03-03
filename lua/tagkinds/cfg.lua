@@ -27,6 +27,17 @@ local prefix_util = require("fluxtags.prefix")
 
 local M = {}
 
+--- Descriptions for each supported directive key.
+--- @type table<string, string>
+local directive_descriptions = {
+    ft = "Set the buffer filetype (e.g., ft(lua))",
+    conceallevel = "Set conceallevel for this buffer (0-3)",
+    fluxtags = "Disable all fluxtags processing (off)",
+    fluxtags_hl = "Disable highlighting in regions (e.g., fluxtags_hl(start,end))",
+    fluxtags_reg = "Disable tag registration in regions (e.g., fluxtags_reg(start,end))",
+    modeline = "Execute an arbitrary Ex command",
+}
+
 --- Handlers for each supported directive key.
 --- Each handler receives the parenthesised value string and the target bufnr.
 --- @type table<string, fun(value: string, bufnr: number)>
@@ -72,13 +83,32 @@ function M.known_keys()
     return keys
 end
 
+--- Get all registered directives with their descriptions as a list of tables.
+---
+--- @return {key: string, description: string}[]
+function M.get_directives_info()
+    local directives = {}
+    for key in pairs(directive_handlers) do
+        table.insert(directives, {
+            key = key,
+            description = directive_descriptions[key] or "No description available",
+        })
+    end
+    table.sort(directives, function(a, b) return a.key < b.key end)
+    return directives
+end
+
 --- Register a custom directive handler at runtime.
 --- Allows other plugins or user config to extend cfg without forking the module.
 ---
 --- @param key string Directive name (e.g. "mykey")
 --- @param handler fun(value: string, bufnr: number)
-function M.register_handler(key, handler)
+--- @param description? string Optional description for the directive
+function M.register_handler(key, handler, description)
     directive_handlers[key] = handler
+    if description then
+        directive_descriptions[key] = description
+    end
 end
 
 --- Register the `cfg` tag kind with fluxtags.

@@ -301,13 +301,75 @@ function M.setup(fluxtags)
 
     vim.api.nvim_create_user_command("FTagsCfgList", function()
         local cfg_mod = require("tagkinds.cfg")
-        local keys = cfg_mod.known_keys()
-        if #keys == 0 then
+        local directives = cfg_mod.get_directives_info()
+        
+        if #directives == 0 then
             vim.notify("No cfg directives registered", vim.log.levels.INFO)
-        else
-            vim.notify("Known cfg directives:\n  " .. table.concat(keys, "\n  "), vim.log.levels.INFO)
+            return
         end
-    end, { desc = "List all known cfg directive keys" })
+        
+        -- Try to use snacks picker if available
+        local ok, snacks = pcall(require, "snacks")
+        if ok and snacks.picker then
+            local items = {}
+            for _, dir in ipairs(directives) do
+                table.insert(items, {
+                    text = string.format("%-16s %s", dir.key, dir.description),
+                    title = dir.key,
+                    key = dir.key,
+                    desc = dir.description,
+                })
+            end
+            snacks.picker.pick({
+                items = items,
+                title = "Cfg Directives",
+                format = "text",
+                confirm = function(picker) end,
+            })
+            return
+        end
+        
+        -- Try to use telescope if available
+        local ok_tel, telescope = pcall(require, "telescope.builtin")
+        if ok_tel then
+            local make_entry = require("telescope.make_entry")
+            local finders = require("telescope.finders")
+            local pickers = require("telescope.pickers")
+            local conf = require("telescope.config").values
+            
+            local finder = finders.new_table({
+                results = directives,
+                entry_maker = function(entry)
+                    return {
+                        value = entry.key,
+                        display = string.format("%-16s %s", entry.key, entry.description),
+                        ordinal = entry.key,
+                    }
+                end,
+            })
+            
+            pickers.new({}, {
+                prompt_title = "Cfg Directives",
+                finder = finder,
+                sorter = conf.generic_sorter({}),
+                attach_mappings = function(prompt_bufnr, map)
+                    local actions = require("telescope.actions")
+                    actions.select_default:replace(function()
+                        actions.close(prompt_bufnr)
+                    end)
+                    return true
+                end,
+            }):find()
+            return
+        end
+        
+        -- Fallback: show in notification
+        local lines = { "Cfg Directives:" }
+        for _, dir in ipairs(directives) do
+            table.insert(lines, string.format("  %-16s %s", dir.key, dir.description))
+        end
+        vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+    end, { desc = "List all registered cfg directives with descriptions" })
 
     vim.api.nvim_create_user_command("FTagsPreview", function(opts)
         local kind = opts.args ~= "" and opts.args or nil
