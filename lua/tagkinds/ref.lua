@@ -2,7 +2,7 @@
 ---     ref — references to mark tags.
 ---
 ---     Two syntaxes are supported:
----       Block form:   `-- |||<name>|||`   (conceals delimiters to `|`)
+---       Block form:   `-- /@@<name>` (conceals delimiters to `/@`)
 ---       Inline form:  `@<base>.<subtag>`  (no conceal; highlights whole token)
 ---
 ---     Pressing Ctrl-] on either form resolves the base tag name against the
@@ -33,20 +33,18 @@ function M.register(fluxtags)
     local marks_cfg  = (fluxtags.config.kinds and fluxtags.config.kinds.mark) or {}
     local kind_name  = cfg.name     or "ref"
     local hl_group   = cfg.hl_group or "FluxTagRef"
-    local pattern    = cfg.pattern  or "|||([%w_.%-%+%*%/%\\:]+)|||"
+    local pattern    = cfg.pattern  or "/@@([%w_.%-%+%*%/%\\:]+)"
     local prefix_patterns = cfg.comment_prefix_patterns or prefix_util.default_comment_prefix_patterns
 
-    -- Derive open/close delimiters from the pattern when not set explicitly,
+    -- Derive open delimiter from the pattern when not set explicitly,
     -- so custom patterns with different delimiters still conceal correctly.
-    local open, close
-    if cfg.open and cfg.close then
-        open, close = cfg.open, cfg.close
+    local open
+    if cfg.open then
+        open = cfg.open
     else
-        open  = pattern:match("^(.-)%(%S%+%)") or "|||"
-        close = pattern:match("%(%S%+%)(.+)$") or "|||"
+        open = pattern:match("^(.-)%(%S%+%)") or "/@@"
     end
-    local conceal_open  = cfg.conceal_open  or "|"
-    local conceal_close = cfg.conceal_close or "|"
+    local conceal_open = cfg.conceal_open or "/@"
 
     -- The name of the marks kind may be customised; look it up so jumps use the
     -- right tagfile even when the user has renamed it.
@@ -63,12 +61,11 @@ function M.register(fluxtags)
             return name:match("^[%w_.%-%+%*%/%\\:]+$") ~= nil
         end,
 
-        --- Conceal `-- |||` and trailing `|||`; keep the name highlighted.
+        --- Conceal `-- /@@` to `/@`; keep the name highlighted.
         conceal_pattern = function(name)
             return {
                 { offset = 0,                   length = #open,  char = conceal_open  },
                 { offset = #open,               length = #name,  hl_group = hl_group  },
-                { offset = #open + #name,       length = #close, char = conceal_close },
             }
         end,
 
@@ -133,7 +130,7 @@ function M.register(fluxtags)
     function ref_kind:apply_extmarks(bufnr, lnum, line, ns)
         local priority = self.priority or 1100
 
-        -- Block form: conceal delimiters, highlight name.
+        -- Block form: conceal delimiter, highlight name.
         for match_start, name in line:gmatch("()" .. self.pattern) do
             local prefix_start, prefix_text = prefix_util.find_prefix(line, match_start, prefix_patterns)
             local col0 = prefix_start - 1
@@ -146,12 +143,6 @@ function M.register(fluxtags)
             })
             pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len, {
                 end_col  = col0 + open_len + #name,
-                hl_group = self.hl_group,
-                priority = priority,
-            })
-            pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len + #name, {
-                end_col  = col0 + open_len + #name + #close,
-                conceal  = conceal_close,
                 hl_group = self.hl_group,
                 priority = priority,
             })
