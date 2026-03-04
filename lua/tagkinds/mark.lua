@@ -15,15 +15,10 @@
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
+local jump_util = require("fluxtags.jump")
+local kind_common = require("tagkinds.common")
 
 local M = {}
-
---- Extract the base name from a possibly-dotted mark (e.g. "config.defaults" -> "config").
---- @param mark_name string
---- @return string
-local function base_tag_name(mark_name)
-    return mark_name:match("^([^.]+)")
-end
 
 --- Register the `mark` tag kind with fluxtags.
 ---
@@ -32,13 +27,24 @@ end
 ---
 --- @param fluxtags table The main fluxtags module table
 function M.register(fluxtags)
-    local cfg       = (fluxtags.config.kinds and fluxtags.config.kinds.mark) or {}
-    local kind_name = cfg.name      or "mark"
-    local pattern   = cfg.pattern   or "@@@([%w_.%-%+%*%/%\\:]+)"
-    local hl_group  = cfg.hl_group  or "FluxTagMarks"
-    local open      = cfg.open      or "@@@"
-    local conceal_open = cfg.conceal_open or "@"
-    local prefix_patterns = cfg.comment_prefix_patterns or prefix_util.default_comment_prefix_patterns
+    local _, opts = kind_common.resolve_kind_config(
+        fluxtags,
+        "mark",
+        {
+            name = "mark",
+            pattern = "@@@([%w_.%-%+%*%/%\\:]+)",
+            hl_group = "FluxTagMarks",
+            open = "@@@",
+            conceal_open = "@",
+        },
+        prefix_util.default_comment_prefix_patterns
+    )
+    local kind_name = opts.name
+    local pattern = opts.pattern
+    local hl_group = opts.hl_group
+    local open = opts.open
+    local conceal_open = opts.conceal_open
+    local prefix_patterns = opts.comment_prefix_patterns
 
     --- Create a conceal highlight variant without underline.
     --- This group is used to highlight the concealed `@` character, ensuring it doesn't inherit
@@ -57,12 +63,10 @@ function M.register(fluxtags)
         name           = kind_name,
         pattern        = pattern,
         hl_group       = hl_group,
-        priority       = cfg.priority,
+        priority       = opts.priority,
         save_to_tagfile = true,
 
-        is_valid = function(name)
-            return name:match("^[%w_.%-%+%*%/%\\:]+$") ~= nil
-        end,
+        is_valid = kind_common.is_valid_name,
 
         --- Conceal optional comment prefix + `@@@` to a single `@`.
         conceal_pattern = function(name)
@@ -77,31 +81,12 @@ function M.register(fluxtags)
     --- then fall back to the base name (e.g., @@@config).
     on_jump = function(name, ctx)
         local tags = ctx.utils.load_tagfile(ctx.kind_name)
-        local entries = tags[name]
-
-        -- Try the full name first, then fall back to base name for subtags
-        if not entries then
-            local base = base_tag_name(name)
-            if base ~= name then
-                entries = tags[base]
-            end
-        end
+        local entries, resolved = jump_util.find_entries(tags, name)
 
         if entries and entries[1] then
-            local entry = entries[1]
-            ctx.utils.open_file(entry.file, ctx)
-            local line = vim.api.nvim_buf_get_lines(0, entry.lnum - 1, entry.lnum, false)[1] or ""
-            local col  = line:find(name, 1, true)
-            if not col then
-                -- If the full name wasn't found in the line, try the base name
-                local base = base_tag_name(name)
-                if base ~= name then
-                    col = line:find(base, 1, true)
-                end
-            end
-            vim.fn.cursor(entry.lnum, col or 1)
-            return true
+            return jump_util.jump_to_entry(name, resolved, entries[1], ctx)
         end
+
         vim.notify("Tag not found: " .. name, vim.log.levels.WARN)
         return true
         end,
@@ -109,24 +94,17 @@ function M.register(fluxtags)
 
     --- Override find_at_cursor to also detect the inline `@base.sub` form.
     function kind:find_at_cursor(line, col)
-        -- Check block form first.
-        local search_from = 1
-        while true do
-            local s, e, name = line:find(self.pattern, search_from)
-            if not s then break end
-            local prefix_start = prefix_util.find_prefix(line, s, prefix_patterns)
-            if col >= prefix_start and col <= e then return name, prefix_start, e end
-            search_from = e + 1
+        local name, s, e = prefix_util.find_tag_at_cursor(line, col, self.pattern, prefix_patterns)
+        if name then
+            return name, s, e
         end
 
         -- Fall back to inline dotted form: @word.word (requires at least one dot).
-        search_from = 1
-        while true do
-            local s, e, mark = line:find("@([%w_.%-%+%*%/%\\:]+%.[%w_.%-%+%*%/%\\:]+)", search_from)
-            if not s then return nil end
-            if col >= s and col <= e then return mark, s, e end
-            search_from = e + 1
-        end
+        return prefix_util.find_match_at_cursor(
+            line,
+            col,
+            kind_common.INLINE_SUBTAG_PATTERN
+        )
     end
 
     function kind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)

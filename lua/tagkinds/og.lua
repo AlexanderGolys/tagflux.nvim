@@ -16,6 +16,8 @@
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
+local picker_util = require("fluxtags.picker")
+local kind_common = require("tagkinds.common")
 
 local M = {}
 
@@ -23,24 +25,33 @@ local M = {}
 ---
 --- @param fluxtags table The main fluxtags module table
 function M.register(fluxtags)
-    local cfg       = (fluxtags.config.kinds and fluxtags.config.kinds.og) or {}
-    local kind_name = cfg.name     or "og"
-    local pattern   = cfg.pattern  or "@##([%w_.%-%+%*%/%\\:]+)"
-    local hl_group  = cfg.hl_group or "FluxTagOg"
-    local open      = cfg.open     or "@##"
-    local conceal_open = cfg.conceal_open or "#"
-    local prefix_patterns = cfg.comment_prefix_patterns or prefix_util.default_comment_prefix_patterns
+    local _, opts = kind_common.resolve_kind_config(
+        fluxtags,
+        "og",
+        {
+            name = "og",
+            pattern = "@##([%w_.%-%+%*%/%\\:]+)",
+            hl_group = "FluxTagOg",
+            open = "@##",
+            conceal_open = "#",
+        },
+        prefix_util.default_comment_prefix_patterns
+    )
+    local kind_name = opts.name
+    local pattern = opts.pattern
+    local hl_group = opts.hl_group
+    local open = opts.open
+    local conceal_open = opts.conceal_open
+    local prefix_patterns = opts.comment_prefix_patterns
 
     local kind = tag_kind.new({
         name            = kind_name,
         pattern         = pattern,
         hl_group        = hl_group,
-        priority        = cfg.priority,
+        priority        = opts.priority,
         save_to_tagfile = true,
 
-        is_valid = function(name)
-            return name:match("^[%w_.%-%+%*%/%\\:]+$") ~= nil
-        end,
+        is_valid = kind_common.is_valid_name,
 
         --- Conceal optional comment prefix + `@##` to `#`.
         conceal_pattern = function(name)
@@ -61,112 +72,40 @@ function M.register(fluxtags)
                 return true
             end
 
-            local ok_telescope, telescope = pcall(require, "telescope.pickers")
-            if ok_telescope then
-                local finders     = require("telescope.finders")
-                local conf        = require("telescope.config").values
-                local actions     = require("telescope.actions")
-                local action_state = require("telescope.actions.state")
-                local previewers  = require("telescope.previewers")
-
-                telescope.new({}, {
-                    prompt_title = "#" .. name,
-                    finder = finders.new_table({
-                        results = entries,
-                        entry_maker = function(entry)
-                            return {
-                                value   = entry,
-                                display = string.format("%s:%d", vim.fn.fnamemodify(entry.file, ":~:."), entry.lnum),
-                                ordinal = entry.file .. entry.lnum,
-                            }
-                        end,
-                    }),
-                    previewer = previewers.new_buffer_previewer({
-                        define_preview = function(self, entry)
-                            conf.buffer_previewer_maker(entry.value.file, self.state.bufnr, {
-                                bufname = self.state.bufname,
-                            })
-                            vim.api.nvim_buf_call(self.state.bufnr, function()
-                                vim.fn.cursor(entry.value.lnum, entry.value.col or 1)
-                            end)
-                        end,
-                    }),
-                    sorter = conf.generic_sorter({}),
-                    attach_mappings = function(prompt_bufnr)
-                        actions.select_default:replace(function()
-                            actions.close(prompt_bufnr)
-                            local selection = action_state.get_selected_entry()
-                            ctx.utils.open_file(selection.value.file, ctx)
-                            vim.fn.cursor(selection.value.lnum, selection.value.col or 1)
-                        end)
-                        return true
-                    end,
-                }):find()
-            else
-                vim.ui.select(entries, {
-                    prompt = "#" .. name,
-                    format_item = function(entry)
-                        return string.format("%s:%d", vim.fn.fnamemodify(entry.file, ":~:."), entry.lnum)
-                    end,
-                }, function(choice)
-                    if choice then
-                        ctx.utils.open_file(choice.file, ctx)
-                        vim.fn.cursor(choice.lnum, choice.col or 1)
-                    end
-                end)
-            end
+            picker_util.pick_locations(entries, "#" .. name, ctx)
             return true
         end,
     })
 
     function kind:find_at_cursor(line, col)
-        local search_from = 1
-        while true do
-            local s, e, name = line:find(self.pattern, search_from)
-            if not s then return nil end
-            local prefix_start = prefix_util.find_prefix(line, s, prefix_patterns)
-            if col >= prefix_start and col <= e then return name, prefix_start, e end
-            search_from = e + 1
-        end
+        return prefix_util.find_tag_at_cursor(line, col, self.pattern, prefix_patterns)
     end
 
     function kind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
-        local priority = self.priority or 1100
-        for match_start, name in line:gmatch("()" .. pattern) do
-            local prefix_start, prefix_text = prefix_util.find_prefix(line, match_start, prefix_patterns)
-            local col0 = prefix_start - 1
-            local open_len = #prefix_text + #open
-
-            local is_disabled_tag = is_disabled and is_disabled(lnum, col0)
-
-            if not is_disabled_tag then
-                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0, {
-                    end_col  = col0 + open_len,
-                    conceal  = conceal_open,
-                    hl_group = self.hl_group,
-                    priority = priority,
-                })
-                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len, {
-                    end_col  = col0 + open_len + #name,
-                    hl_group = self.hl_group,
-                    priority = priority,
-                })
-            end
-        end
+        prefix_util.apply_prefixed_extmarks(bufnr, ns, lnum, line, pattern, prefix_patterns, {
+            open = open,
+            conceal_open = conceal_open,
+            hl_group = self.hl_group,
+            priority = self.priority,
+        }, is_disabled)
     end
 
     --- Override collect_tags to record the column of each match so the picker
     --- can position the cursor precisely on the hashtag, not just the line start.
-    function kind:collect_tags(filepath, lines)
+    function kind:collect_tags(filepath, lines, is_disabled)
         local tags = {}
         for lnum, line in ipairs(lines) do
             for match_start, name in line:gmatch("()" .. pattern) do
-                table.insert(tags, {
-                    name = name,
-                    file = filepath,
-                    lnum = lnum,
-                    col  = match_start + #open,
-                })
+                local prefix_start, prefix_text = prefix_util.find_prefix(line, match_start, prefix_patterns)
+                local col0 = prefix_start - 1
+                if not (is_disabled and is_disabled(lnum - 1, col0)) then
+                    table.insert(tags, {
+                        name = name,
+                        file = filepath,
+                        lnum = lnum,
+                        col  = col0 + #prefix_text + #open + 1,
+                    })
+                end
             end
         end
         return tags

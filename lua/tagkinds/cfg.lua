@@ -24,6 +24,7 @@
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
+local kind_common = require("tagkinds.common")
 
 local M = {}
 
@@ -115,24 +116,65 @@ end
 ---
 --- @param fluxtags table The main fluxtags module table
 function M.register(fluxtags)
-    local cfg = (fluxtags.config.kinds and fluxtags.config.kinds.cfg) or {}
+    local cfg, opts = kind_common.resolve_kind_config(
+        fluxtags,
+        "cfg",
+        {
+            name = "cfg",
+            hl_group = "FluxTagCfg",
+            open = "$$$",
+        },
+        prefix_util.default_comment_prefix_patterns
+    )
 
-    local kind_name = cfg.name or "cfg"
-    -- Two internal patterns: base_pattern matches the key alone (used for
-    -- scanning); args_pattern additionally captures parenthesised arguments
-    -- (kept for reference — argument extraction is done via sub-string matching).
+    local kind_name = opts.name
+    -- base_pattern matches the key. Arguments are extracted from the suffix.
     local base_pattern = "%$%$%$([%w_]+)"
-    local args_pattern = "%$%$%$([%w_]+)%b()"  -- luacheck: ignore (kept for docs)
     local pattern      = cfg.pattern  -- nil = use built-in two-step extraction
-    local prefix_patterns = cfg.comment_prefix_patterns or prefix_util.default_comment_prefix_patterns
+    local prefix_patterns = opts.comment_prefix_patterns
+    local search_pattern = pattern or base_pattern
+    local parse_args = not pattern
+
+    ---@param line string
+    ---@return {s:number, e:number, key:string, value:string, tag_end:number}[]
+    local function parse_line_directives(line)
+        local directives = {}
+        local search_from = 1
+
+        while true do
+            local s, e, key = line:find(search_pattern, search_from)
+            if not s then break end
+
+            local value = ""
+            local tag_end = e
+            if parse_args then
+                local args = line:sub(e + 1):match("^%b()")
+                if args then
+                    value = args:sub(2, -2)
+                    tag_end = e + #args
+                end
+            end
+
+            table.insert(directives, {
+                s = s,
+                e = e,
+                key = key,
+                value = value,
+                tag_end = tag_end,
+            })
+            search_from = e + 1
+        end
+
+        return directives
+    end
 
     local cfg_diag_ns = fluxtags.utils.make_diag_ns("cfg")
 
     local kind = tag_kind.new({
         name            = kind_name,
         pattern         = pattern or base_pattern,
-        hl_group        = cfg.hl_group or "FluxTagCfg",
-        priority        = cfg.priority,
+        hl_group        = opts.hl_group,
+        priority        = opts.priority,
         save_to_tagfile = false,
 
         extract_name = function(match) return match end,
@@ -143,25 +185,14 @@ function M.register(fluxtags)
         --- Runs once on buffer enter before extmarks are drawn.
         on_enter = function(bufnr, lines)
             for _, line in ipairs(lines) do
-                local search_from = 1
-                while true do
-                    local s, e, key = line:find(pattern or base_pattern, search_from)
-                    if not s then break end
-
-                    -- Extract the parenthesised value (e.g. `(lua)` -> `lua`).
-                    local value = ""
-                    if not pattern then
-                        local args = line:sub(e + 1):match("^%b()")
-                        if args then value = args:sub(2, -2) end
-                    end
-
+                for _, directive in ipairs(parse_line_directives(line)) do
+                    local key = directive.key
                     if directive_handlers[key] then
-                        local ok, err = pcall(directive_handlers[key], value, bufnr)
+                        local ok, err = pcall(directive_handlers[key], directive.value, bufnr)
                         if not ok then
                             vim.notify("fluxtags cfg: " .. key .. ": " .. tostring(err), vim.log.levels.WARN)
                         end
                     end
-                    search_from = e + 1
                 end
             end
         end,
@@ -172,21 +203,18 @@ function M.register(fluxtags)
     --- @param is_disabled? fun(lnum: number, col: number): boolean
     function kind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
         local priority    = self.priority or 1100
-        local open        = cfg.open or "$$$"
+        local open        = opts.open
         local conceal_char = cfg.conceal_open or open:sub(1, 1)
-        local search_from = 1
 
-        while true do
-            local s, e = line:find(pattern or base_pattern, search_from)
-            if not s then break end
+        for _, directive in ipairs(parse_line_directives(line)) do
+            local s = directive.s
+            local highlight_end = directive.tag_end
 
             local prefix_start, prefix_text = prefix_util.find_prefix(line, s, prefix_patterns)
             local col0 = prefix_start - 1
             local open_len = #prefix_text + #open
 
-            if is_disabled and is_disabled(lnum, col0) then
-                search_from = e + 1
-            else
+            if not (is_disabled and is_disabled(lnum, col0)) then
                 -- Conceal `$$$` to a single `$`.
                 vim.api.nvim_buf_set_extmark(bufnr, ns, lnum, col0, {
                     end_col  = col0 + open_len,
@@ -195,20 +223,11 @@ function M.register(fluxtags)
                     priority = priority,
                 })
 
-                -- Extend highlight to include the `(value)` argument when present.
-                local highlight_end = e
-                if not pattern then
-                    local args = line:sub(e + 1):match("^%b()")
-                    if args then highlight_end = e + #args end
-                end
-
                 vim.api.nvim_buf_set_extmark(bufnr, ns, lnum, col0 + open_len, {
                     end_col  = highlight_end,
                     hl_group = self.hl_group,
                     priority = priority,
                 })
-
-                search_from = e + 1
             end
         end
     end
@@ -217,30 +236,23 @@ function M.register(fluxtags)
     --- unknown directive keys.
     --- @param is_disabled? fun(lnum: number, col: number): boolean
     function kind:apply_diagnostics(bufnr, lines, is_disabled)
-        local open     = cfg.open or "$$$"
+        local open     = opts.open
         local priority = (self.priority or 1100) + 10
         local diags    = {}
 
         for lnum0, line in ipairs(lines) do
-            local search_from = 1
-            while true do
-                local s, e, key = line:find(pattern or base_pattern, search_from)
-                if not s then break end
+            for _, directive in ipairs(parse_line_directives(line)) do
+                local s = directive.s
+                local key = directive.key
+                local arg_end = directive.tag_end
 
                 local prefix_start, prefix_text = prefix_util.find_prefix(line, s, prefix_patterns)
                 local col0 = prefix_start - 1
                 local open_len = #prefix_text + #open
-                if is_disabled and is_disabled(lnum0 - 1, col0) then
-                    search_from = e + 1
-                else
+                if not (is_disabled and is_disabled(lnum0 - 1, col0)) then
                     if not directive_handlers[key] then
                         local key_col0  = col0 + open_len
                         local key_end   = key_col0 + #key
-                        local arg_end   = e
-                        if not pattern then
-                            local args = line:sub(e + 1):match("^%b()")
-                            if args then arg_end = e + #args end
-                        end
 
                         -- Error highlight over prefix + key + args.
                         pcall(vim.api.nvim_buf_set_extmark, bufnr, fluxtags.utils.ns, lnum0 - 1, col0, {
@@ -259,8 +271,6 @@ function M.register(fluxtags)
                             source   = "fluxtags.cfg",
                         })
                     end
-
-                    search_from = e + 1
                 end
             end
         end
@@ -270,29 +280,19 @@ function M.register(fluxtags)
 
     --- Get disabled intervals for a specific directive (e.g. "fluxtags_hl")
     --- Returns an array of { start_lnum, start_col, end_lnum, end_col }
-    function kind:get_disabled_intervals(lines, directive)
+    function kind:get_disabled_intervals(lines, directive_name)
         local intervals = {}
         local is_off = false
         local start_pos = nil
 
-        local search_pattern = pattern or base_pattern
-
         for lnum0, line in ipairs(lines) do
-            local search_from = 1
-            while true do
-                local s, e, key = line:find(search_pattern, search_from)
-                if not s then break end
+            for _, item in ipairs(parse_line_directives(line)) do
+                local s = item.s
+                local key = item.key
 
-                if key == directive then
-                    local value = ""
-                    local tag_end = e
-                    if not pattern then
-                        local args = line:sub(e + 1):match("^%b()")
-                        if args then
-                            value = args:sub(2, -2)
-                            tag_end = e + #args
-                        end
-                    end
+                if key == directive_name then
+                    local value = item.value
+                    local tag_end = item.tag_end
 
                     if value == "off" and not is_off then
                         is_off = true
@@ -303,7 +303,6 @@ function M.register(fluxtags)
                         start_pos = nil
                     end
                 end
-                search_from = e + 1
             end
         end
 

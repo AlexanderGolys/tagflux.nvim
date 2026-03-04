@@ -45,6 +45,8 @@ local kind_help = {
     },
 }
 
+local preview_kinds = { "mark", "ref", "refog", "bib", "og", "hl", "cfg" }
+
 local function notify_kind_help(kind)
     local item = kind_help[kind]
     if not item then return false end
@@ -53,7 +55,7 @@ local function notify_kind_help(kind)
 end
 
 --- Format a tag entry as a single human-readable string for display in pickers.
---- Pattern: `[kind] name -> relative/path:lnum`
+--- Pattern: `[kind] name`
 ---
 --- @param entry {kind:string, name:string, file:string, lnum:number}
 --- @return string
@@ -86,7 +88,6 @@ local function collect_picker_entries(tag_kinds, load_tagfile, kind_filter)
                         file = e.file,
                         lnum = e.lnum,
                         col  = e.col,
-                        pos  = { e.lnum, e.col or 1 },
                     }
                     item.text = format_tag_entry(item)
                     table.insert(entries, item)
@@ -116,6 +117,104 @@ local function jump_to_picker_entry(fluxtags, tag_kinds, entry)
     vim.fn.cursor(entry.lnum, col or 1)
 end
 
+--- Show a read-only text list using telescope when available.
+---
+--- @param title string
+--- @param items {text:string, ordinal?:string}[]
+--- @return boolean shown
+local function pick_static_items(title, items)
+    local ok_telescope, pickers = pcall(require, "telescope.pickers")
+    if ok_telescope then
+        local finders = require("telescope.finders")
+        local conf = require("telescope.config").values
+        local actions = require("telescope.actions")
+
+        pickers.new({}, {
+            prompt_title = title,
+            finder = finders.new_table({
+                results = items,
+                entry_maker = function(entry)
+                    return {
+                        value = entry,
+                        display = entry.text,
+                        ordinal = entry.ordinal or entry.text,
+                    }
+                end,
+            }),
+            sorter = conf.generic_sorter({}),
+            attach_mappings = function(prompt_bufnr)
+                actions.select_default:replace(function()
+                    actions.close(prompt_bufnr)
+                end)
+                return true
+            end,
+        }):find()
+
+        return true
+    end
+
+    return false
+end
+
+--- Show tag entries with preview and confirm handling.
+--- Backend priority: telescope.nvim > notify fallback.
+---
+--- @param title string
+--- @param entries table[]
+--- @param on_confirm fun(entry: table)
+local function pick_tag_entries(title, entries, on_confirm)
+    local ok_telescope, telescope = pcall(require, "telescope.pickers")
+    if ok_telescope then
+        local finders = require("telescope.finders")
+        local conf = require("telescope.config").values
+        local actions = require("telescope.actions")
+        local action_state = require("telescope.actions.state")
+        local previewers = require("telescope.previewers")
+
+        telescope.new({}, {
+            prompt_title = title,
+            finder = finders.new_table({
+                results = entries,
+                entry_maker = function(entry)
+                    return {
+                        value = entry,
+                        display = entry.text,
+                        ordinal = entry.kind .. entry.name .. entry.file .. entry.lnum,
+                    }
+                end,
+            }),
+            previewer = previewers.new_buffer_previewer({
+                define_preview = function(self, entry)
+                    conf.buffer_previewer_maker(entry.value.file, self.state.bufnr, {
+                        bufname = self.state.bufname,
+                    })
+                    vim.api.nvim_buf_call(self.state.bufnr, function()
+                        vim.fn.cursor(entry.value.lnum, 1)
+                    end)
+                end,
+            }),
+            sorter = conf.generic_sorter({}),
+            attach_mappings = function(prompt_bufnr)
+                actions.select_default:replace(function()
+                    actions.close(prompt_bufnr)
+                    local selection = action_state.get_selected_entry()
+                    if selection and selection.value then
+                        on_confirm(selection.value)
+                    end
+                end)
+                return true
+            end,
+        }):find()
+        return
+    end
+
+    local lines = {}
+    for _, entry in ipairs(entries) do
+        table.insert(lines, entry.text)
+    end
+    vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+end
+
 --- Register all :FTags* user commands and the Ctrl-] keymap.
 ---
 --- @param fluxtags table The main fluxtags module table
@@ -126,15 +225,16 @@ function M.setup(fluxtags)
     local prune_tagfile = fluxtags.prune_tagfile
     local setup_buffer  = fluxtags.setup_buffer
     local _config       = require("fluxtags_config")
-
-    vim.api.nvim_create_user_command("FTagsUpdate", function()
+    local update_tags = function()
         fluxtags.update_tags(false)
-    end, { desc = "Scan buffer and persist tags to tagfiles" })
+    end
+
+    vim.api.nvim_create_user_command("FTagsUpdate", update_tags, {
+        desc = "Scan buffer and persist tags to tagfiles",
+    })
 
     -- FTagsSave is an alias kept for muscle-memory compatibility.
-    vim.api.nvim_create_user_command("FTagsSave", function()
-        fluxtags.update_tags(false)
-    end, { desc = "Alias for FTagsUpdate" })
+    vim.api.nvim_create_user_command("FTagsSave", update_tags, { desc = "Alias for FTagsUpdate" })
 
     vim.api.nvim_create_user_command("FTagsLoad", function()
         local total = fluxtags.load_all_tags()
@@ -222,70 +322,9 @@ function M.setup(fluxtags)
         end
 
         local title = kind_filter and ("Tags (" .. kind_filter .. ")") or "Tags"
-
-        -- Picker priority: snacks.nvim > telescope > vim.notify fallback.
-        local ok_snacks, snacks = pcall(require, "snacks")
-        if ok_snacks and snacks.picker then
-            snacks.picker.pick({
-                title   = title,
-                items   = entries,
-                format  = "text",
-                preview = "file",
-                confirm = function(picker, item)
-                    picker:close()
-                    if item then jump_to_picker_entry(fluxtags, tag_kinds, item) end
-                end,
-            })
-            return
-        end
-
-        local ok_telescope, telescope = pcall(require, "telescope.pickers")
-        if ok_telescope then
-            local finders     = require("telescope.finders")
-            local conf        = require("telescope.config").values
-            local actions     = require("telescope.actions")
-            local action_state = require("telescope.actions.state")
-            local previewers  = require("telescope.previewers")
-
-            telescope.new({}, {
-                prompt_title = title,
-                finder = finders.new_table({
-                    results = entries,
-                    entry_maker = function(entry)
-                        return {
-                            value    = entry,
-                            display  = entry.text,
-                            ordinal  = entry.kind .. entry.name .. entry.file .. entry.lnum,
-                        }
-                    end,
-                }),
-                previewer = previewers.new_buffer_previewer({
-                    define_preview = function(self, entry)
-                        conf.buffer_previewer_maker(entry.value.file, self.state.bufnr, {
-                            bufname = self.state.bufname,
-                        })
-                        vim.api.nvim_buf_call(self.state.bufnr, function()
-                            vim.fn.cursor(entry.value.lnum, 1)
-                        end)
-                    end,
-                }),
-                sorter = conf.generic_sorter({}),
-                attach_mappings = function(prompt_bufnr)
-                    actions.select_default:replace(function()
-                        actions.close(prompt_bufnr)
-                        local selection = action_state.get_selected_entry()
-                        jump_to_picker_entry(fluxtags, tag_kinds, selection.value)
-                    end)
-                    return true
-                end,
-            }):find()
-            return
-        end
-
-        -- Last resort: dump all entries as a notification.
-        local lines = {}
-        for _, e in ipairs(entries) do table.insert(lines, e.text) end
-        vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+        pick_tag_entries(title, entries, function(entry)
+            jump_to_picker_entry(fluxtags, tag_kinds, entry)
+        end)
     end, {
         nargs    = "?",
         desc     = "Open a picker of saved tags; optional kind argument filters results",
@@ -308,65 +347,22 @@ function M.setup(fluxtags)
             return
         end
         
-        -- Try to use snacks picker if available
-        local ok, snacks = pcall(require, "snacks")
-        if ok and snacks.picker then
-            local items = {}
-            for _, dir in ipairs(directives) do
-                table.insert(items, {
-                    text = string.format("%-16s %s", dir.key, dir.description),
-                    title = dir.key,
-                    key = dir.key,
-                    desc = dir.description,
-                })
-            end
-            snacks.picker.pick({
-                items = items,
-                title = "Cfg Directives",
-                format = "text",
-                confirm = function(picker) end,
+        local items = {}
+        for _, dir in ipairs(directives) do
+            table.insert(items, {
+                text = string.format("%-16s %s", dir.key, dir.description),
+                ordinal = dir.key,
             })
+        end
+
+        if pick_static_items("Cfg Directives", items) then
             return
         end
-        
-        -- Try to use telescope if available
-        local ok_tel, telescope = pcall(require, "telescope.builtin")
-        if ok_tel then
-            local make_entry = require("telescope.make_entry")
-            local finders = require("telescope.finders")
-            local pickers = require("telescope.pickers")
-            local conf = require("telescope.config").values
-            
-            local finder = finders.new_table({
-                results = directives,
-                entry_maker = function(entry)
-                    return {
-                        value = entry.key,
-                        display = string.format("%-16s %s", entry.key, entry.description),
-                        ordinal = entry.key,
-                    }
-                end,
-            })
-            
-            pickers.new({}, {
-                prompt_title = "Cfg Directives",
-                finder = finder,
-                sorter = conf.generic_sorter({}),
-                attach_mappings = function(prompt_bufnr, map)
-                    local actions = require("telescope.actions")
-                    actions.select_default:replace(function()
-                        actions.close(prompt_bufnr)
-                    end)
-                    return true
-                end,
-            }):find()
-            return
-        end
-        
+
         -- Fallback: show in notification
         local lines = { "Cfg Directives:" }
-        for _, dir in ipairs(directives) do
-            table.insert(lines, string.format("  %-16s %s", dir.key, dir.description))
+        for _, item in ipairs(items) do
+            table.insert(lines, "  " .. item.text)
         end
         vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
     end, { desc = "List all registered cfg directives with descriptions" })
@@ -380,24 +376,18 @@ function M.setup(fluxtags)
             return
         end
 
-        local lines = {
-            "Tag kinds:",
-            "  mark: " .. kind_help.mark.syntax,
-            "  ref:  " .. kind_help.ref.syntax,
-            "  refog:" .. kind_help.refog.syntax,
-            "  bib:  " .. kind_help.bib.syntax,
-            "  og:   " .. kind_help.og.syntax,
-            "  hl:   " .. kind_help.hl.syntax,
-            "  cfg:  " .. kind_help.cfg.syntax,
-            "",
-            "Use :FTagsPreview <kind> for details.",
-        }
+        local lines = { "Tag kinds:" }
+        for _, key in ipairs(preview_kinds) do
+            table.insert(lines, string.format("  %-5s %s", key .. ":", kind_help[key].syntax))
+        end
+        table.insert(lines, "")
+        table.insert(lines, "Use :FTagsPreview <kind> for details.")
         vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
     end, {
         nargs = "?",
         desc = "Show syntax and quick help for tag kinds",
         complete = function()
-            return { "mark", "ref", "refog", "bib", "og", "hl", "cfg" }
+            return preview_kinds
         end,
     })
 
@@ -407,6 +397,10 @@ function M.setup(fluxtags)
         -- Load mark and og tags from tagfiles
         local marks = load_tagfile("mark") or {}
         local ogs = load_tagfile("og") or {}
+        local cwd_prefix = vim.loop.cwd() .. "/"
+        local function relpath(path)
+            return path:gsub("^" .. cwd_prefix, "")
+        end
         
         local lines = {}
         table.insert(lines, "# Fluxtags Project Tree")
@@ -426,7 +420,7 @@ function M.setup(fluxtags)
             
             for _, item in ipairs(sorted_marks) do
                 local entry = item.entry
-                local file = entry.file:gsub("^" .. vim.loop.cwd() .. "/", "")
+                local file = relpath(entry.file)
                 table.insert(lines, string.format("- `@@@%s` — %s:%d", item.name, file, entry.lnum))
             end
             table.insert(lines, "")
@@ -445,7 +439,7 @@ function M.setup(fluxtags)
             for _, item in ipairs(sorted_ogs) do
                 table.insert(lines, string.format("### @##%s (%d occurrences)", item.name, #item.entries))
                 for _, entry in ipairs(item.entries) do
-                    local file = entry.file:gsub("^" .. vim.loop.cwd() .. "/", "")
+                    local file = relpath(entry.file)
                     table.insert(lines, string.format("  - %s:%d", file, entry.lnum))
                 end
                 table.insert(lines, "")

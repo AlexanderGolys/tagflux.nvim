@@ -16,6 +16,7 @@
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
+local kind_common = require("tagkinds.common")
 
 local M = {}
 
@@ -23,19 +24,30 @@ local M = {}
 ---
 --- @param fluxtags table The main fluxtags module table
 function M.register(fluxtags)
-    local cfg       = (fluxtags.config.kinds and fluxtags.config.kinds.bib) or {}
-    local kind_name = cfg.name     or "bib"
-    local pattern   = cfg.pattern  or "///(%S+)"
-    local hl_group  = cfg.hl_group or "FluxTagBib"
-    local open      = cfg.open     or "///"
-    local conceal_open = cfg.conceal_open or "/"
-    local prefix_patterns = cfg.comment_prefix_patterns or prefix_util.default_comment_prefix_patterns
+    local _, opts = kind_common.resolve_kind_config(
+        fluxtags,
+        "bib",
+        {
+            name = "bib",
+            pattern = "///(%S+)",
+            hl_group = "FluxTagBib",
+            open = "///",
+            conceal_open = "/",
+        },
+        prefix_util.default_comment_prefix_patterns
+    )
+    local kind_name = opts.name
+    local pattern = opts.pattern
+    local hl_group = opts.hl_group
+    local open = opts.open
+    local conceal_open = opts.conceal_open
+    local prefix_patterns = opts.comment_prefix_patterns
 
     local kind = tag_kind.new({
         name            = kind_name,
         pattern         = pattern,
         hl_group        = hl_group,
-        priority        = cfg.priority,
+        priority        = opts.priority,
         save_to_tagfile = false,
 
         --- Conceal optional comment prefix + `///` to `/`.
@@ -69,39 +81,16 @@ function M.register(fluxtags)
     })
 
     function kind:find_at_cursor(line, col)
-        local search_from = 1
-        while true do
-            local s, e, target = line:find(self.pattern, search_from)
-            if not s then return nil end
-            local prefix_start = prefix_util.find_prefix(line, s, prefix_patterns)
-            if col >= prefix_start and col <= e then return target, prefix_start, e end
-            search_from = e + 1
-        end
+        return prefix_util.find_tag_at_cursor(line, col, self.pattern, prefix_patterns)
     end
 
     function kind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
-        local priority = self.priority or 1100
-        for match_start, target in line:gmatch("()" .. self.pattern) do
-            local prefix_start, prefix_text = prefix_util.find_prefix(line, match_start, prefix_patterns)
-            local col0 = prefix_start - 1
-            local open_len = #prefix_text + #open
-
-            local is_disabled_tag = is_disabled and is_disabled(lnum, col0)
-
-            if not is_disabled_tag then
-                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0, {
-                    end_col  = col0 + open_len,
-                    conceal  = conceal_open,
-                    hl_group = self.hl_group,
-                    priority = priority,
-                })
-                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len, {
-                    end_col  = col0 + open_len + #target,
-                    hl_group = self.hl_group,
-                    priority = priority,
-                })
-            end
-        end
+        prefix_util.apply_prefixed_extmarks(bufnr, ns, lnum, line, self.pattern, prefix_patterns, {
+            open = open,
+            conceal_open = conceal_open,
+            hl_group = self.hl_group,
+            priority = self.priority,
+        }, is_disabled)
     end
 
     fluxtags.register_kind(kind)

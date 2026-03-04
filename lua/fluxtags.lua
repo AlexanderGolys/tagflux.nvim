@@ -2,13 +2,13 @@
 -- ###tag-kind
 
 -- @@@fluxtags
--- |||fluxtags.bib|||
--- |||fluxtags.cfg|||
--- |||fluxtags.hl|||
--- |||fluxtags.og|||
--- |||fluxtags.ref|||
--- |||fluxtags.mark|||
--- |||fluxtags.config|||
+-- /@@fluxtags.bib
+-- /@@fluxtags.cfg
+-- /@@fluxtags.hl
+-- /@@fluxtags.og
+-- /@@fluxtags.ref
+-- /@@fluxtags.mark
+-- /@@fluxtags.config
 -- ///a
 -- $$$loca
 -- &&&Error&&&err&&&
@@ -88,6 +88,21 @@ local diag_ns = vim.api.nvim_create_namespace("fluxtags_diag")
 --- Registry of all active TagKind instances, keyed by kind name.
 --- Populated during setup() as each kind module calls register_kind().
 local tag_kinds = {}
+local tag_kind_order = {}
+
+---@return fun(): string, TagKind
+local function ordered_kinds()
+    local index = 0
+    return function()
+        index = index + 1
+        local kind_name = tag_kind_order[index]
+        if not kind_name then
+            return nil
+        end
+
+        return kind_name, tag_kinds[kind_name]
+    end
+end
 
 --- In-memory cache of loaded tagfile contents, keyed by kind name.
 --- Each value is a table mapping tag name -> list of {file, lnum, col?} entries.
@@ -98,7 +113,26 @@ M.tag_cache = {}
 ---
 --- @param kind TagKind
 function M.register_kind(kind)
+    if not tag_kinds[kind.name] then
+        table.insert(tag_kind_order, kind.name)
+    end
     tag_kinds[kind.name] = kind
+end
+
+---@param line string
+---@return string|nil
+---@return string|nil
+---@return number|nil
+---@return number|nil
+local function parse_tagfile_line(line)
+    local name, file, lnum, col = line:match("^([^\t]+)\t([^\t]+)\t(%d+)\t?(%d*)")
+    if not (name and file and lnum) then
+        return nil
+    end
+
+    local lnum_num = tonumber(lnum)
+    local col_num = col ~= "" and tonumber(col) or nil
+    return name, file, lnum_num, col_num
 end
 
 --- Read a tagfile from disk and return its contents as a name-indexed table.
@@ -118,17 +152,98 @@ local function read_tagfile(kind_name)
 
     local tags = {}
     for _, line in ipairs(vim.fn.readfile(kind.tagfile)) do
-        local name, file, lnum, col = line:match("^([^\t]+)\t([^\t]+)\t(%d+)\t?(%d*)")
+        local name, file, lnum, col = parse_tagfile_line(line)
         if name then
             tags[name] = tags[name] or {}
-            local entry = { file = file, lnum = tonumber(lnum) }
-            if col and col ~= "" then
-                entry.col = tonumber(col)
+            local entry = { file = file, lnum = lnum }
+            if col then
+                entry.col = col
             end
             table.insert(tags[name], entry)
         end
     end
     return tags
+end
+
+---@param tag {lnum:number, col?:number}
+---@return string
+local function tag_position_key(tag)
+    return string.format("%d:%d", tag.lnum, tag.col or 0)
+end
+
+---@param positions {lnum:number, col?:number}[]
+local function sort_positions(positions)
+    table.sort(positions, function(a, b)
+        if a.lnum ~= b.lnum then
+            return a.lnum < b.lnum
+        end
+        return (a.col or 0) < (b.col or 0)
+    end)
+end
+
+---@param tags {name:string, lnum:number, col?:number}[]
+---@return table<string, {lnum:number, col?:number}[]>
+local function group_tags_by_name(tags)
+    local grouped = {}
+    for _, tag in ipairs(tags) do
+        grouped[tag.name] = grouped[tag.name] or {}
+        table.insert(grouped[tag.name], { lnum = tag.lnum, col = tag.col })
+    end
+
+    for _, positions in pairs(grouped) do
+        sort_positions(positions)
+    end
+
+    return grouped
+end
+
+---@param previous table<string, {lnum:number, col?:number}[]>
+---@param current table<string, {lnum:number, col?:number}[]>
+---@return number
+---@return number
+---@return number
+local function diff_entries(previous, current)
+    local added, removed, modified = 0, 0, 0
+    local all_names = {}
+
+    for name in pairs(previous) do
+        all_names[name] = true
+    end
+    for name in pairs(current) do
+        all_names[name] = true
+    end
+
+    for name in pairs(all_names) do
+        local prev_entries = previous[name] or {}
+        local curr_entries = current[name] or {}
+        local common = math.min(#prev_entries, #curr_entries)
+
+        for i = 1, common do
+            if tag_position_key(prev_entries[i]) ~= tag_position_key(curr_entries[i]) then
+                modified = modified + 1
+            end
+        end
+
+        if #curr_entries > #prev_entries then
+            added = added + (#curr_entries - #prev_entries)
+        elseif #prev_entries > #curr_entries then
+            removed = removed + (#prev_entries - #curr_entries)
+        end
+    end
+
+    return added, removed, modified
+end
+
+---@param added number
+---@param removed number
+---@param modified number
+---@return string[]
+local function format_change_parts(added, removed, modified)
+    local parts = {}
+    if added > 0 then table.insert(parts, string.format("+%d", added)) end
+    if removed > 0 then table.insert(parts, string.format("-%d", removed)) end
+    if modified > 0 then table.insert(parts, string.format("~%d", modified)) end
+    return parts
 end
 
 --- Persist the tags found in a single file, replacing that file's previous entries.
@@ -154,22 +269,22 @@ local function write_tagfile(kind_name, filepath, new_tags)
     local lines_to_keep    = {}
     if vim.fn.filereadable(kind.tagfile) == 1 then
         for _, line in ipairs(vim.fn.readfile(kind.tagfile)) do
-            local name, file, lnum, col = line:match("^([^\t]+)\t([^\t]+)\t(%d+)\t?(%d*)")
+            local name, file, lnum, col = parse_tagfile_line(line)
             if file == filepath and name then
-                previous_entries[name] = {
-                    lnum = tonumber(lnum),
-                    col  = col ~= "" and tonumber(col) or nil,
-                }
+                previous_entries[name] = previous_entries[name] or {}
+                table.insert(previous_entries[name], { lnum = lnum, col = col })
             elseif file ~= filepath then
                 table.insert(lines_to_keep, line)
             end
         end
+
+        for _, positions in pairs(previous_entries) do
+            sort_positions(positions)
+        end
     end
 
     -- Append new entries and build a lookup for diffing.
-    local new_entries_by_name = {}
     for _, tag in ipairs(new_tags) do
-        new_entries_by_name[tag.name] = tag
         if tag.col then
             table.insert(lines_to_keep, string.format("%s\t%s\t%d\t%d", tag.name, tag.file, tag.lnum, tag.col))
         else
@@ -177,20 +292,8 @@ local function write_tagfile(kind_name, filepath, new_tags)
         end
     end
 
-    local added, removed, modified = 0, 0, 0
-    for name, prev in pairs(previous_entries) do
-        if not new_entries_by_name[name] then
-            removed = removed + 1
-        end
-    end
-    for name, new in pairs(new_entries_by_name) do
-        local prev = previous_entries[name]
-        if not prev then
-            added = added + 1
-        elseif prev.lnum ~= new.lnum or prev.col ~= new.col then
-            modified = modified + 1
-        end
-    end
+    local new_entries_by_name = group_tags_by_name(new_tags)
+    local added, removed, modified = diff_entries(previous_entries, new_entries_by_name)
 
     table.sort(lines_to_keep)
     vim.fn.writefile(lines_to_keep, kind.tagfile)
@@ -215,40 +318,33 @@ local function remove_stale_tagfile_entries(kind_name)
     local removed = 0
 
     for _, line in ipairs(vim.fn.readfile(kind.tagfile)) do
-        local name, file, lnum = line:match("^([^\t]+)\t([^\t]+)\t(%d+)")
-        if not (name and file and lnum) then
+        local name, file, lnum = parse_tagfile_line(line)
+        
+        -- Malformed entries or non-existent files get removed
+        if not (name and file and lnum) or vim.fn.filereadable(file) ~= 1 then
             removed = removed + 1
-            goto continue
-        end
+        else
+            if not file_lines_cache[file] then
+                file_lines_cache[file] = vim.fn.readfile(file)
+            end
 
-        if vim.fn.filereadable(file) ~= 1 then
-            removed = removed + 1
-            goto continue
-        end
-
-        if not file_lines_cache[file] then
-            file_lines_cache[file] = vim.fn.readfile(file)
-        end
-
-        local line_index = tonumber(lnum)
-        local text = line_index and file_lines_cache[file][line_index]
-        local still_present = false
-        if text then
-            for match in text:gmatch(kind.pattern) do
-                if match == name then
-                    still_present = true
-                    break
+            local text = file_lines_cache[file][lnum]
+            local still_present = false
+            if text then
+                for match in text:gmatch(kind.pattern) do
+                    if match == name then
+                        still_present = true
+                        break
+                    end
                 end
             end
-        end
 
-        if still_present then
-            table.insert(kept, line)
-        else
-            removed = removed + 1
+            if still_present then
+                table.insert(kept, line)
+            else
+                removed = removed + 1
+            end
         end
-
-        ::continue::
     end
 
     table.sort(kept)
@@ -329,7 +425,7 @@ end
 --- @return number total
 function M.load_all_tags()
     local total = 0
-    for kind_name, kind in pairs(tag_kinds) do
+    for kind_name, kind in ordered_kinds() do
         if kind.save_to_tagfile then
             for _, entries in pairs(M.load_tags(kind_name)) do
                 total = total + #entries
@@ -367,7 +463,7 @@ local function redraw_extmarks(bufnr)
 
     if vim.b[bufnr].fluxtags_disabled then
         -- Clear diagnostics for all kinds since tags are disabled
-        for kind_name, _ in pairs(tag_kinds) do
+        for kind_name in ordered_kinds() do
             local kind_diag_ns = make_diag_ns(kind_name)
             set_diagnostics(bufnr, kind_diag_ns, {})
         end
@@ -386,12 +482,12 @@ local function redraw_extmarks(bufnr)
     end
 
     for lnum, line in ipairs(lines) do
-        for _, kind in pairs(tag_kinds) do
+        for _, kind in ordered_kinds() do
             kind:apply_extmarks(bufnr, lnum - 1, line, ns, check_hl_disabled)
         end
     end
 
-    for _, kind in pairs(tag_kinds) do
+    for _, kind in ordered_kinds() do
         if kind.apply_diagnostics then
             kind:apply_diagnostics(bufnr, lines, check_hl_disabled)
         end
@@ -407,7 +503,7 @@ function M.jump_to_tag()
     local line = vim.api.nvim_get_current_line()
     local col  = vim.fn.col(".")
 
-    for kind_name, kind in pairs(tag_kinds) do
+    for kind_name, kind in ordered_kinds() do
         local tag_name, s, e = kind:find_at_cursor(line, col)
         if tag_name and s and col >= s and col <= e then
             local claimed = kind.on_jump(tag_name, {
@@ -451,7 +547,7 @@ function M.update_tags(silent, bufnr)
     local total_added, total_removed, total_modified = 0, 0, 0
     local changed_kinds = {}
 
-    for kind_name, kind in pairs(tag_kinds) do
+    for kind_name, kind in ordered_kinds() do
         if kind.save_to_tagfile then
             local tags  = is_disabled and {} or kind:collect_tags(filepath, lines, check_reg_disabled)
             local stats = write_tagfile(kind_name, filepath, tags)
@@ -475,17 +571,11 @@ function M.update_tags(silent, bufnr)
             return a.name < b.name
         end)
 
-        local total_parts = {}
-        if total_added    > 0 then table.insert(total_parts, string.format("+%d", total_added))    end
-        if total_removed  > 0 then table.insert(total_parts, string.format("-%d", total_removed))  end
-        if total_modified > 0 then table.insert(total_parts, string.format("~%d", total_modified)) end
+        local total_parts = format_change_parts(total_added, total_removed, total_modified)
 
         local per_kind_parts = {}
         for _, item in ipairs(changed_kinds) do
-            local parts = {}
-            if item.added    > 0 then table.insert(parts, string.format("+%d", item.added))    end
-            if item.removed  > 0 then table.insert(parts, string.format("-%d", item.removed))  end
-            if item.modified > 0 then table.insert(parts, string.format("~%d", item.modified)) end
+            local parts = format_change_parts(item.added, item.removed, item.modified)
             table.insert(per_kind_parts, string.format("%s(%s)", item.name, table.concat(parts, " ")))
         end
 
@@ -508,7 +598,7 @@ end
 --- @param bufnr number
 local function run_on_enter_hooks(bufnr)
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    for _, kind in pairs(tag_kinds) do
+    for _, kind in ordered_kinds() do
         if kind.on_enter then
             kind.on_enter(bufnr, lines)
         end
@@ -551,6 +641,7 @@ end
 ---
 --- @param bufnr number
 local function schedule_debounced_refresh(bufnr)
+    if not vim.api.nvim_buf_is_valid(bufnr) then return end
     if vim.b[bufnr].fluxtags_refresh_scheduled then return end
     vim.b[bufnr].fluxtags_refresh_scheduled = true
 
