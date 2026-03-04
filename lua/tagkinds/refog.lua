@@ -10,7 +10,7 @@
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
 local picker_util = require("fluxtags.picker")
-local kind_common = require("tagkinds.common")
+local kind_common = require("fluxtags.common")
 
 local M = {}
 

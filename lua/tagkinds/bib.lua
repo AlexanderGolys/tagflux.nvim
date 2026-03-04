@@ -12,17 +12,17 @@
 --- @brief ]]
 
 -- @@@fluxtags.bib
--- ###tag-kind
+-- @##tag-kind
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
-local kind_common = require("tagkinds.common")
+local kind_common = require("fluxtags.common")
 
 local M = {}
 
 --- Register the `bib` tag kind with fluxtags.
----
 --- @param fluxtags table The main fluxtags module table
+---
 function M.register(fluxtags)
     local _, opts = kind_common.resolve_kind_config(
         fluxtags,
