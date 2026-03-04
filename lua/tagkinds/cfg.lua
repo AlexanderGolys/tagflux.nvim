@@ -20,7 +20,7 @@
 --- @brief ]]
 
 -- @@@fluxtags.cfg
--- ###tag-kind
+-- @##tag-kind
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")

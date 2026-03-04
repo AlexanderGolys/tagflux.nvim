@@ -10,8 +10,9 @@
 ---     themselves — they are ephemeral pointers.
 --- @brief ]]
 
--- @@@fluxtags.ref
--- ###tag-kind
+    -- @@@fluxtags.ref
+    -- @##tag-kind
+-- /@@fluxtags
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
@@ -44,7 +45,7 @@ function M.register(fluxtags)
     else
         open = pattern:match("^(.-)%(%S%+%)") or "/@@"
     end
-    local conceal_open = cfg.conceal_open or "/@"
+    local conceal_open = cfg.conceal_open or "@@"
 
     -- The name of the marks kind may be customised; look it up so jumps use the
     -- right tagfile even when the user has renamed it.

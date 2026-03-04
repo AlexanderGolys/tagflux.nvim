@@ -132,29 +132,27 @@ function M.register(fluxtags)
             local col0 = prefix_start - 1
             local open_len = #prefix_text + #open
 
-            if is_disabled and is_disabled(lnum, col0) then
-                goto continue
+            local is_disabled_tag = is_disabled and is_disabled(lnum, col0)
+
+            if not is_disabled_tag then
+                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0, {
+                    end_col  = col0 + open_len,
+                    conceal  = conceal_open,
+                    hl_group = self.hl_group,
+                    priority = priority,
+                })
+                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len, {
+                    end_col  = col0 + open_len + #name,
+                    hl_group = self.hl_group,
+                    priority = priority,
+                })
+                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len + #name, {
+                    end_col  = col0 + open_len + #name + #close,
+                    conceal  = conceal_close,
+                    hl_group = self.hl_group,
+                    priority = priority,
+                })
             end
-
-            pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0, {
-                end_col  = col0 + open_len,
-                conceal  = conceal_open,
-                hl_group = self.hl_group,
-                priority = priority,
-            })
-            pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len, {
-                end_col  = col0 + open_len + #name,
-                hl_group = self.hl_group,
-                priority = priority,
-            })
-            pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len + #name, {
-                end_col  = col0 + open_len + #name + #close,
-                conceal  = conceal_close,
-                hl_group = self.hl_group,
-                priority = priority,
-            })
-
-            ::continue::
         end
     end
 
