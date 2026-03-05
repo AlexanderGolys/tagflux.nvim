@@ -15,6 +15,7 @@ end
 ---@param default_prefix_patterns? string[]
 ---@return table cfg
 ---@return table resolved
+---
 function M.resolve_kind_config(fluxtags, kind_name, defaults, default_prefix_patterns)
     local cfg = (fluxtags.config.kinds and fluxtags.config.kinds[kind_name]) or {}
     local resolved = vim.deepcopy(defaults)
@@ -33,6 +34,7 @@ end
 ---@param pattern string
 ---@param fallback string
 ---@return string
+---
 function M.derive_open(pattern, fallback)
     return pattern:match("^(.-)%(%S%+%)") or fallback
 end

@@ -2,6 +2,7 @@ local M = {}
 
 ---@param name string
 ---@return string
+---
 function M.base_name(name)
     return name:match("^([^.]+)") or name
 end
@@ -10,6 +11,7 @@ end
 ---@param name string
 ---@return table[]|nil
 ---@return string resolved_name
+---
 function M.find_entries(tags, name)
     local entries = tags[name]
     if entries then
@@ -29,6 +31,7 @@ end
 ---@param entry table
 ---@param ctx table
 ---@return boolean
+---
 function M.jump_to_entry(search_name, fallback_name, entry, ctx)
     ctx.utils.open_file(entry.file, ctx)
     local line = vim.api.nvim_buf_get_lines(0, entry.lnum - 1, entry.lnum, false)[1] or ""

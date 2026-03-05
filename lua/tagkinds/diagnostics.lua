@@ -1,0 +1,45 @@
+local M = {}
+
+---@param diags vim.Diagnostic[]
+---@param bufnr number
+---@param lnum number
+---@param col number
+---@param end_col number
+---@param severity integer
+---@param source string
+---@param message string
+function M.push(diags, bufnr, lnum, col, end_col, severity, source, message)
+    table.insert(diags, {
+        bufnr = bufnr,
+        lnum = lnum,
+        col = col,
+        end_col = end_col,
+        severity = severity,
+        source = source,
+        message = message,
+    })
+end
+
+---@param bufnr number
+---@param ns number
+---@param diags vim.Diagnostic[]
+---@param set_diagnostics fun(bufnr:number, ns:number, diags:vim.Diagnostic[])
+function M.publish(bufnr, ns, diags, set_diagnostics)
+    set_diagnostics(bufnr, ns, diags)
+end
+
+---@param bufnr number
+---@param ns number
+---@param lnum number
+---@param col number
+---@param end_col number
+---@param priority number
+function M.error_extmark(bufnr, ns, lnum, col, end_col, priority)
+    pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col, {
+        end_col = end_col,
+        hl_group = "FluxTagError",
+        priority = priority,
+    })
+end
+
+return M
