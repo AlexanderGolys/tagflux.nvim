@@ -2,7 +2,7 @@
 --- bib — external link tags.
 --- @brief ]]
 
-local prefixed = require("tagkinds.prefixed")
+local prefixed = require("tagkinds.prefixed_kind")
 
 local M = {}
 

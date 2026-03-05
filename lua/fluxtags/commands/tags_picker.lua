@@ -1,4 +1,4 @@
-local common = require("fluxtags.commands.common")
+local common = require("fluxtags.commands.kind_help")
 
 local M = {}
 

@@ -2,7 +2,7 @@
 --- ref — references to mark tags.
 --- @brief ]]
 
-local prefixed = require("tagkinds.prefixed")
+local prefixed = require("tagkinds.prefixed_kind")
 local jump_util = require("fluxtags.jump")
 local kind_common = require("fluxtags.common")
 local prefix_util = require("fluxtags.prefix")

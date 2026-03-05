@@ -2,7 +2,7 @@
 --- refog — references to og tags.
 --- @brief ]]
 
-local prefixed = require("tagkinds.prefixed")
+local prefixed = require("tagkinds.prefixed_kind")
 local picker_util = require("fluxtags.picker")
 local kind_common = require("fluxtags.common")
 local diag = require("tagkinds.diagnostics")

@@ -2,7 +2,7 @@
 --- og — hashtag tags.
 --- @brief ]]
 
-local prefixed = require("tagkinds.prefixed")
+local prefixed = require("tagkinds.prefixed_kind")
 local picker_util = require("fluxtags.picker")
 local prefix_util = require("fluxtags.prefix")
 local kind_common = require("fluxtags.common")

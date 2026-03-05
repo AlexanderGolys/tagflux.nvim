@@ -1,7 +1,7 @@
 local M = {}
 
-local cmd_common = require("fluxtags.commands.common")
-local cmd_picker = require("fluxtags.commands.picker")
+local cmd_common = require("fluxtags.commands.kind_help")
+local cmd_picker = require("fluxtags.commands.tags_picker")
 local cmd_debug = require("fluxtags.commands.debug")
 local cmd_tree = require("fluxtags.commands.tree")
 
