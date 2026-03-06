@@ -8,15 +8,16 @@ local M = {}
 
 ---@param fluxtags table
 function M.register(fluxtags)
-    local _, opts = prefixed.resolve(fluxtags, "bib", {
+    local binder = prefixed.binder(fluxtags, "bib", {
         name = "bib",
         pattern = "///([%.%-/:%w]+)",
         hl_group = "FluxTagBib",
         open = "///",
         conceal_open = "/",
     })
+    local opts = binder.opts
 
-    local kind = prefixed.new_kind({
+    local kind = binder:new_kind({
         name = opts.name,
         pattern = opts.pattern,
         hl_group = opts.hl_group,
@@ -44,8 +45,8 @@ function M.register(fluxtags)
         end,
     })
 
-    prefixed.attach_find_at_cursor(kind, opts.pattern, opts.comment_prefix_patterns)
-    prefixed.attach_prefixed_extmarks(kind, opts.pattern, opts.comment_prefix_patterns, {
+    binder:attach_find_at_cursor(kind)
+    binder:attach_prefixed_extmarks(kind, {
         open = opts.open,
         conceal_open = opts.conceal_open,
     })

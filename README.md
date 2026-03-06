@@ -22,7 +22,6 @@ A lightweight tagging system for Neovim that lets you create marks, references, 
   config = function()
     require("fluxtags").setup()
   end,
-}
 ```
 
 ### packer.nvim

@@ -3,7 +3,7 @@ local M = {}
 local helpers = require("tests.test_helpers")
 
 function M.run()
-    local common = require("tagkinds.common")
+    local common = require("fluxtags.common")
     
     -- Test 1: is_valid_name with valid names
     print("Test 1: is_valid_name - valid names")

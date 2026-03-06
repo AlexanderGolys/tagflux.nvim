@@ -13,7 +13,7 @@ local M = {}
 ---@param fluxtags table
 function M.register(fluxtags)
     local og_cfg = (fluxtags.config.kinds and fluxtags.config.kinds.og) or {}
-    local _, opts = prefixed.resolve(fluxtags, "refog", {
+    local binder = prefixed.binder(fluxtags, "refog", {
         name = "refog",
         pattern = "#|#||([%w_.%-%+%*%/%\\:]+)||",
         hl_group = "FluxTagRef",
@@ -22,10 +22,11 @@ function M.register(fluxtags)
         conceal_open = "#",
         conceal_close = "",
     })
+    local opts = binder.opts
     local og_kind_name = og_cfg.name or "og"
     local refog_diag_ns = fluxtags.utils.make_diag_ns("refog")
 
-    local kind = prefixed.new_kind({
+    local kind = binder:new_kind({
         name = opts.name,
         pattern = opts.pattern,
         hl_group = opts.hl_group,
@@ -51,8 +52,8 @@ function M.register(fluxtags)
         end,
     })
 
-    prefixed.attach_find_at_cursor(kind, opts.pattern, opts.comment_prefix_patterns)
-    prefixed.attach_prefixed_extmarks(kind, opts.pattern, opts.comment_prefix_patterns, {
+    binder:attach_find_at_cursor(kind)
+    binder:attach_prefixed_extmarks(kind, {
         open = opts.open,
         close = opts.close,
         conceal_open = opts.conceal_open,
