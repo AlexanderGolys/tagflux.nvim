@@ -1,7 +1,9 @@
 local M = {}
+local Path = require("fluxtags.path")
+local path_utils = Path.new()
 
 function M.run()
-    local dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h")
+    local dir = path_utils:dirname(debug.getinfo(1, "S").source:sub(2))
     local pattern = dir .. "/*_spec.lua"
     local files = vim.split(vim.fn.glob(pattern), "\n")
     
@@ -11,7 +13,7 @@ function M.run()
 
     for _, file in ipairs(files) do
         if file ~= "" then
-            print("\nRunning " .. vim.fn.fnamemodify(file, ":t") .. "...")
+            print("\nRunning " .. path_utils:basename(file) .. "...")
             local chunk, err = loadfile(file)
             if not chunk then
                 print("Failed to load: " .. file .. "\n" .. err)

@@ -1,4 +1,5 @@
 local M = {}
+local Extmark = require("fluxtags.extmark")
 
 M.default_comment_prefix_patterns = {
     "%-%-%s*",
@@ -120,21 +121,21 @@ function M.apply_prefixed_extmarks(bufnr, ns, lnum, line, pattern, prefix_patter
         local open_len = #prefix_text + #open
 
         if not (is_disabled and is_disabled(lnum, col0)) then
-            pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0, {
+            Extmark.place(bufnr, ns, lnum, col0, {
                 end_col = col0 + open_len,
                 conceal = conceal_open,
                 hl_group = open_hl_group,
                 priority = priority,
             })
 
-            pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len, {
+            Extmark.place(bufnr, ns, lnum, col0 + open_len, {
                 end_col = col0 + open_len + #name,
                 hl_group = name_hl_group,
                 priority = priority,
             })
 
             if close ~= "" or conceal_close ~= nil then
-                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0 + open_len + #name, {
+                Extmark.place(bufnr, ns, lnum, col0 + open_len + #name, {
                     end_col = col0 + open_len + #name + #close,
                     conceal = conceal_close,
                     hl_group = close_hl_group,

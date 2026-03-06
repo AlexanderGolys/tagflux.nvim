@@ -7,6 +7,7 @@
 --- @brief ]]
 
 local M = {}
+local Extmark = require("fluxtags.extmark")
 
 --- @class ConcealSpec
 --- @field offset number Byte offset from the start of the full match
@@ -121,7 +122,7 @@ function TagKind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
                         if spec.char ~= nil then
                             extmark_opts.conceal = spec.char
                         end
-                        pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, seg_start, extmark_opts)
+                        Extmark.place(bufnr, ns, lnum, seg_start, extmark_opts)
                     end
                 end
             else
@@ -129,7 +130,7 @@ function TagKind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
                 local prefix_len = #(self.pattern:match("^(.-)%(") or "")
                 local seg_end    = col0 + prefix_len + #capture
                 if seg_end >= col0 then
-                    pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0, {
+                    Extmark.place(bufnr, ns, lnum, col0, {
                         end_col  = seg_end,
                         hl_group = self.hl_group,
                         priority = self.priority,

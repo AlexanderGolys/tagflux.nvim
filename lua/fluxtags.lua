@@ -8,6 +8,7 @@
 --- @brief ]]
 
 local config_mod = require("fluxtags_config")
+local Path = require("fluxtags.path")
 
 local M = {}
 
@@ -31,6 +32,7 @@ local App = {}
 App.__index = App
 
 local BUILTIN_FILETYPE_EXCLUDES = { oil = true, ["neo-tree"] = true, neotree = true }
+local path_utils = Path.new()
 
 ---@param list? string[]
 ---@param value string
@@ -301,12 +303,12 @@ end
 ---@param path string
 ---@param ctx? table
 function App:open_file(path, ctx)
-    local target = vim.fn.fnamemodify(path, ":p")
+    local target = path_utils:absolute(path)
     for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
         if vim.api.nvim_win_is_valid(winid) then
             local win_buf = vim.api.nvim_win_get_buf(winid)
             local win_path = vim.api.nvim_buf_get_name(win_buf)
-            if win_path ~= "" and vim.fn.fnamemodify(win_path, ":p") == target then
+            if win_path ~= "" and path_utils:absolute(win_path) == target then
                 vim.api.nvim_set_current_win(winid)
                 return
             end

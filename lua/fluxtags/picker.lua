@@ -1,4 +1,6 @@
 local M = {}
+local Path = require("fluxtags.path")
+local path_utils = Path.new()
 
 ---@param entry table
 ---@param ctx table
@@ -26,7 +28,7 @@ function M.pick_locations(entries, title, ctx)
                 entry_maker = function(entry)
                     return {
                         value = entry,
-                        display = string.format("%s:%d", vim.fn.fnamemodify(entry.file, ":~:."), entry.lnum),
+                        display = string.format("%s:%d", path_utils:display_relative(entry.file), entry.lnum),
                         ordinal = entry.file .. entry.lnum,
                     }
                 end,
@@ -57,7 +59,7 @@ function M.pick_locations(entries, title, ctx)
     vim.ui.select(entries, {
         prompt = title,
         format_item = function(entry)
-            return string.format("%s:%d", vim.fn.fnamemodify(entry.file, ":~:."), entry.lnum)
+            return string.format("%s:%d", path_utils:display_relative(entry.file), entry.lnum)
         end,
     }, function(choice)
         if choice then

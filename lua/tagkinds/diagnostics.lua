@@ -1,4 +1,5 @@
 local M = {}
+local Extmark = require("fluxtags.extmark")
 
 ---@param diags vim.Diagnostic[]
 ---@param bufnr number
@@ -35,7 +36,7 @@ end
 ---@param end_col number
 ---@param priority number
 function M.error_extmark(bufnr, ns, lnum, col, end_col, priority)
-    pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col, {
+    Extmark.place(bufnr, ns, lnum, col, {
         end_col = end_col,
         hl_group = "FluxTagError",
         priority = priority,

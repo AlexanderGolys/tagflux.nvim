@@ -7,25 +7,28 @@ local jump_util = require("fluxtags.jump")
 local kind_common = require("fluxtags.common")
 local prefix_util = require("fluxtags.prefix")
 local diag = require("tagkinds.diagnostics")
+local Extmark = require("fluxtags.extmark")
 
 local M = {}
 
 ---@param fluxtags table
 function M.register(fluxtags)
     local marks_cfg = (fluxtags.config.kinds and fluxtags.config.kinds.mark) or {}
-    local cfg, opts = prefixed.resolve(fluxtags, "ref", {
+    local binder = prefixed.binder(fluxtags, "ref", {
         name = "ref",
         pattern = "/@@([%w_.%-%+%*%/%\\:]+)",
         hl_group = "FluxTagRef",
         conceal_open = "@@",
         priority = 1100,
     })
+    local kind_cfg = binder.cfg
+    local opts = binder.opts
 
-    local open = cfg.open or kind_common.derive_open(opts.pattern, "/@@")
+    local open = kind_cfg.open or kind_common.derive_open(opts.pattern, "/@@")
     local marks_kind_name = marks_cfg.name or "mark"
     local ref_diag_ns = fluxtags.utils.make_diag_ns("ref")
 
-    local kind = prefixed.new_kind({
+    local kind = binder:new_kind({
         name = opts.name,
         pattern = opts.pattern,
         hl_group = opts.hl_group,
@@ -49,7 +52,7 @@ function M.register(fluxtags)
         end,
     })
 
-    prefixed.attach_find_at_cursor(kind, opts.pattern, opts.comment_prefix_patterns, kind_common.INLINE_SUBTAG_PATTERN)
+    binder:attach_find_at_cursor(kind, kind_common.INLINE_SUBTAG_PATTERN)
 
     function kind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
         prefix_util.apply_prefixed_extmarks(bufnr, ns, lnum, line, opts.pattern, opts.comment_prefix_patterns, {
@@ -62,7 +65,7 @@ function M.register(fluxtags)
         for match_start, ref in line:gmatch("()@([%w_.%-%+%*%/%\\:]+%.[%w_.%-%+%*%/%\\:]+)") do
             local col0 = match_start - 1
             if not (is_disabled and is_disabled(lnum, col0)) then
-                pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, lnum, col0, {
+                Extmark.place(bufnr, ns, lnum, col0, {
                     end_col = col0 + 1 + #ref,
                     hl_group = self.hl_group,
                     priority = self.priority or 1100,
