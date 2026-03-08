@@ -10,6 +10,9 @@ local M = {}
 ---@param line string
 ---@param search_pattern string
 ---@param parse_args boolean
+---
+--- Extracts all cfg directives from a single line.
+--- Returns entries with byte offsets and parsed argument value.
 ---@return CfgDirective[]
 function M.parse_line(line, search_pattern, parse_args)
     local directives = {}
@@ -27,7 +30,6 @@ function M.parse_line(line, search_pattern, parse_args)
                 tag_end = e + #args
             end
         end
-
         table.insert(directives, {
             s = s,
             e = e,
@@ -45,6 +47,9 @@ end
 ---@param lines string[]
 ---@param parse_line fun(line:string): CfgDirective[]
 ---@param directive_name string
+---
+--- Computes [lnum,col]-based intervals where a directive is disabled via
+--- `<key>(off)` / `<key>(on)` pairings.
 ---@return table[]
 function M.disabled_intervals(lines, parse_line, directive_name)
     local intervals, is_off, start_pos = {}, false, nil

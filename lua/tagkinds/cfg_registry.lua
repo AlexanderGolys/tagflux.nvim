@@ -1,5 +1,9 @@
 local M = {}
 
+---@class CfgDirectiveSpec
+---@field key string
+---@field description string
+
 local descriptions = {
     ft = "Set the buffer filetype (e.g., ft(lua))",
     conceallevel = "Set conceallevel for this buffer (0-3)",
@@ -35,6 +39,8 @@ local handlers = {
     end,
 }
 
+--- Return all registered cfg directive keys, sorted alphabetically.
+---
 ---@return string[]
 function M.known_keys()
     local keys = {}
@@ -45,7 +51,9 @@ function M.known_keys()
     return keys
 end
 
----@return {key: string, description: string}[]
+--- Return all registered cfg directives with docs for user-facing listing.
+---
+---@return CfgDirectiveSpec[]
 function M.info()
     local directives = {}
     for key in pairs(handlers) do
@@ -58,20 +66,26 @@ function M.info()
     return directives
 end
 
----@param key string
----@param handler fun(value:string, bufnr:number)
----@param description? string
+--- Register or override a cfg directive handler.
+---
+---@param key string Handler name (e.g., "ft", "modeline")
+---@param handler fun(value: string, bufnr: number)
+---@param description? string Optional description shown by :FTagsCfgList
 function M.register(key, handler, description)
     handlers[key] = handler
     if description then descriptions[key] = description end
 end
 
+--- Check whether a directive key is registered.
+---
 ---@param key string
 ---@return boolean
 function M.has(key)
     return handlers[key] ~= nil
 end
 
+--- Execute handler for a directive and normalize result as `(ok, err)`.
+---
 ---@param key string
 ---@param value string
 ---@param bufnr number

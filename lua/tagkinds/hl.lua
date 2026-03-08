@@ -22,15 +22,16 @@ local M = {}
 
 --- Register the `hl` tag kind with fluxtags.
 ---
---- @param fluxtags table The main fluxtags module table
+---@param fluxtags table The main fluxtags module table
+---@return nil
 function M.register(fluxtags)
     local cfg, opts = kind_common.resolve_kind_config(
         fluxtags,
         "hl",
         {
             name = "hl",
-            pattern = "&&&([%w_@-]+)&&&(.-)&&&",
-            open = "&&&",
+            pattern = " &&&([%w_@-]+)&&&(.-)&&&",
+            open = " &&&",
             mid = "&&&",
             close = "&&&",
             conceal_open = "",
@@ -52,17 +53,15 @@ function M.register(fluxtags)
     local conceal_mid = opts.conceal_mid
     local conceal_close = opts.conceal_close
 
-    local kind = tag_kind.new({
-        name            = kind_name,
-        pattern         = pattern,
-        hl_group        = opts.hl_group,
-        priority        = opts.priority,
+    local kind = tag_kind.builder({
+        name = kind_name,
+        pattern = pattern,
+        hl_group = opts.hl_group,
+        priority = opts.priority,
         save_to_tagfile = false,
-
         extract_name = function(match) return match end,
-
         on_jump = function(name, ctx) return false end,
-    })
+    }):build()
 
     --- Custom extmark logic: the group name is embedded in the tag itself, so
     --- we cannot use the generic apply_extmarks path (which uses a fixed hl_group).

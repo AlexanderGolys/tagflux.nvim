@@ -1,8 +1,15 @@
 local M = {}
 
+---@alias FluxtagsKind "mark"|"ref"|"refog"|"bib"|"og"|"hl"|"cfg"
+
+---@class FluxtagsKindHelpItem
+---@field syntax string
+---@field info string
+
+---@type table<FluxtagsKind, FluxtagsKindHelpItem>
 local kind_help = {
     mark = { syntax = "-- @@@<name>", info = "Named anchors persisted to tagfiles; refs jump to these." },
-    ref = { syntax = "-- |||<name>||| or @<base>.<subtag>", info = "References to marks; resolves base name on Ctrl-]." },
+    ref = { syntax = "/@@<name> or @<base>.<subtag>", info = "References to marks; resolves base name on Ctrl-]." },
     refog = { syntax = "#|#||<name>||", info = "Reference-only OG jump tag; does not create saved hashtag entries." },
     bib = { syntax = "-- ///<target>", info = "External links (URL/file/help topic); opens target on Ctrl-]." },
     og = { syntax = "@##<name>", info = "Topic hashtags across files; Ctrl-] opens a picker of occurrences." },
@@ -21,17 +28,17 @@ function M.notify_kind_help(kind)
     return true
 end
 
----@return string[]
+---@return FluxtagsKind[]
 function M.preview_kinds()
     return preview_kinds
 end
 
----@return table<string, {syntax:string, info:string}>
+---@return table<FluxtagsKind, FluxtagsKindHelpItem>
 function M.kind_help()
     return kind_help
 end
 
----@param kind string
+---@param kind FluxtagsKind|string
 ---@return string
 function M.kind_symbol(kind)
     local symbols = { mark = "@", ref = "&", refog = "#", og = "#", cfg = "$", hl = "%", bib = "/" }

@@ -1,7 +1,7 @@
 local M = {}
 
 M.NAME_CHARS = "[%w_.%-%+%*%/%\\:]+"
-M.INLINE_SUBTAG_PATTERN = "@(" .. M.NAME_CHARS .. "%." .. M.NAME_CHARS .. ")"
+M.INLINE_SUBTAG_PATTERN = " @(" .. M.NAME_CHARS .. "%." .. M.NAME_CHARS .. ")"
 
 ---@param name string
 ---@return boolean

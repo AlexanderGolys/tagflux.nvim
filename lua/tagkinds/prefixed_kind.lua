@@ -43,10 +43,29 @@ function Binder.new(fluxtags, kind_name, defaults)
     return self
 end
 
----@param opts table
+--- Return a preconfigured TagKind builder for this binder.
+---@param overrides? TagKindOptions
+---@return TagKindBuilder
+function Binder:kind_builder(overrides)
+    local builder = tag_kind.builder({
+        name = self.opts.name,
+        pattern = self.opts.pattern,
+        hl_group = self.opts.hl_group,
+        priority = self.opts.priority,
+        save_to_tagfile = true,
+    })
+
+    if overrides ~= nil then
+        builder:with_methods(overrides)
+    end
+
+    return builder
+end
+
+---@param opts TagKindOptions
 ---@return TagKind
 function Binder:new_kind(opts)
-    return tag_kind.new(opts)
+    return self:kind_builder(opts):build()
 end
 
 ---@param kind TagKind
@@ -60,7 +79,6 @@ function Binder:attach_find_at_cursor(kind, inline_pattern)
         if inline_pattern then
             return prefix_util.find_match_at_cursor(line, col, inline_pattern)
         end
-        return nil
     end
 end
 

@@ -2,18 +2,26 @@
 --- bib — external link tags.
 --- @brief ]]
 
+-- @@@fluxtags.bib
+
 local prefixed = require("tagkinds.prefixed_kind")
 
 local M = {}
 
+--- Register the `bib` link kind.
+---
+--- Supports URLs, file paths, and Vim help topics. Jumping opens the target using
+--- `vim.ui.open` or `:help`.
+---
 ---@param fluxtags table
+---@return nil
 function M.register(fluxtags)
     local binder = prefixed.binder(fluxtags, "bib", {
         name = "bib",
-        pattern = "///([%.%-/:%w]+)",
+        pattern = " ///([%.%-/:%w]+)",
         hl_group = "FluxTagBib",
-        open = "///",
-        conceal_open = "/",
+        open = " ///",
+        conceal_open = " /",
     })
     local opts = binder.opts
 
@@ -21,7 +29,6 @@ function M.register(fluxtags)
         name = opts.name,
         pattern = opts.pattern,
         hl_group = opts.hl_group,
-        priority = opts.priority,
         save_to_tagfile = false,
         conceal_pattern = function(target)
             return {
@@ -36,7 +43,7 @@ function M.register(fluxtags)
             end
             local expanded = vim.fn.expand(target)
             if vim.fn.filereadable(expanded) == 1 then
-                vim.ui.open(expanded)
+                vim.ui.open(expanded) 
                 return true
             end
             if pcall(vim.cmd, "help " .. target) then return true end

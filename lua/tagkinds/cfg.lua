@@ -11,16 +11,24 @@ local diag = require("tagkinds.diagnostics")
 
 local M = {}
 
+---@alias FluxtagsCfgModuleCfg table<string, string|vim.api.keyset.highlight>
+
+--- Return all registered cfg directive keys from the global registry.
+---
 ---@return string[]
 function M.known_keys()
     return registry.known_keys()
 end
 
+--- Return cfg directive metadata for preview/listing.
+---
 ---@return {key: string, description: string}[]
 function M.get_directives_info()
     return registry.info()
 end
 
+--- Register or replace a cfg handler and optional docs.
+---
 ---@param key string
 ---@param handler fun(value: string, bufnr: number)
 ---@param description? string
@@ -28,16 +36,23 @@ function M.register_handler(key, handler, description)
     registry.register(key, handler, description)
 end
 
+--- Register the `cfg` tag kind.
+---
+--- Parses `$$$key(value)` style directives at file entry and applies handlers.
+--- Invalid directives produce diagnostics and valid directives can be listed via
+--- `:FTagsCfgList`.
+---
 ---@param fluxtags table
+---@return nil
 function M.register(fluxtags)
     local cfg, opts = kind_common.resolve_kind_config(
         fluxtags,
         "cfg",
-        { name = "cfg", hl_group = "FluxTagCfg", open = "$$$" },
+        { name = "cfg", hl_group = "FluxTagCfg", open = " $$$" },
         prefix_util.default_comment_prefix_patterns
     )
 
-    local base_pattern = "%$%$%$([%w_]+)"
+    local base_pattern = " %$%$%$([%w_]+)"
     local pattern = cfg.pattern
     local search_pattern = pattern or base_pattern
     local parse_args = not pattern
@@ -52,7 +67,7 @@ function M.register(fluxtags)
         return parser.parse_line(line, search_pattern, parse_args)
     end
 
-    local kind = tag_kind.new({
+    local kind = tag_kind.builder({
         name = kind_name,
         pattern = pattern or base_pattern,
         hl_group = opts.hl_group,
@@ -60,17 +75,16 @@ function M.register(fluxtags)
         save_to_tagfile = false,
         extract_name = function(match) return match end,
         on_jump = function() return false end,
-        on_enter = function(bufnr, lines)
-            for _, line in ipairs(lines) do
-                for _, item in ipairs(parse_line(line)) do
-                    local ok, err = registry.exec(item.key, item.value, bufnr)
-                    if not ok and err and err ~= "unknown handler" then
-                        vim.notify("fluxtags cfg: " .. item.key .. ": " .. err, vim.log.levels.WARN)
-                    end
+    }):with_on_enter(function(bufnr, lines)
+        for _, line in ipairs(lines) do
+            for _, item in ipairs(parse_line(line)) do
+                local ok, err = registry.exec(item.key, item.value, bufnr)
+                if not ok and err and err ~= "unknown handler" then
+                    vim.notify("fluxtags cfg: " .. item.key .. ": " .. err, vim.log.levels.WARN)
                 end
             end
-        end,
-    })
+        end
+    end):build()
 
     function kind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
         local priority = self.priority or 1100

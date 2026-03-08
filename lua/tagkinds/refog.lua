@@ -3,21 +3,29 @@
 --- @brief ]]
 
 local prefixed = require("tagkinds.prefixed_kind")
-local picker_util = require("fluxtags.picker")
 local kind_common = require("fluxtags.common")
 local diag = require("tagkinds.diagnostics")
 local prefix_util = require("fluxtags.prefix")
+local Runtime = require("tagkinds.runtime")
 
 local M = {}
 
+--- Register the `refog` tag kind.
+---
+--- Reference-only OG syntax that jumps into existing `og` tags and emits
+--- warnings when the referenced topic is missing.
+---
 ---@param fluxtags table
+---@return nil
+
 function M.register(fluxtags)
+    local runtime = Runtime.new(fluxtags)
     local og_cfg = (fluxtags.config.kinds and fluxtags.config.kinds.og) or {}
     local binder = prefixed.binder(fluxtags, "refog", {
         name = "refog",
-        pattern = "#|#||([%w_.%-%+%*%/%\\:]+)||",
+        pattern = " #|#||([%w_.%-%+%*%/%\\:]+)||",
         hl_group = "FluxTagRef",
-        open = "#|#||",
+        open = " #|#||",
         close = "||",
         conceal_open = "#",
         conceal_close = "",
@@ -41,14 +49,37 @@ function M.register(fluxtags)
             }
         end,
         on_jump = function(name, ctx)
-            local tags = ctx.utils.load_tagfile(og_kind_name)
-            local entries = tags[name]
-            if not entries or #entries == 0 then
-                vim.notify("No og tags found: #" .. name, vim.log.levels.WARN)
-                return true
+            return runtime:pick_tag_locations(og_kind_name, name, ctx, "No og tags found: #", "#")
+        end,
+        apply_diagnostics = function(self, bufnr, lines, is_disabled)
+            local tags, diags = fluxtags.utils.load_tagfile(og_kind_name), {}
+
+            for lnum, line in ipairs(lines) do
+                for match_start, name in line:gmatch("()" .. opts.pattern) do
+                    local prefix_start, prefix_text = prefix_util.find_prefix(line, tonumber(match_start), opts.comment_prefix_patterns or {})
+                    ---@cast prefix_start number
+                    ---@cast prefix_text string
+                    local col0 = prefix_start - 1
+                    local name_col0 = col0 + #prefix_text + #opts.open
+                    local name_end = name_col0 + #name
+
+                    if not (is_disabled and is_disabled(lnum - 1, col0)) and (not tags[name] or #tags[name] == 0) then
+                        runtime:push_missing_tag_diagnostic({
+                            diags = diags,
+                            bufnr = bufnr,
+                            lnum = lnum - 1,
+                            col = name_col0,
+                            end_col = name_end,
+                            severity = vim.diagnostic.severity.WARN,
+                            source = "fluxtags.refog",
+                            message_prefix = "Undefined og tag: ",
+                            name = name,
+                        })
+                    end
+                end
             end
-            picker_util.pick_locations(entries, "#" .. name, ctx)
-            return true
+
+            diag.publish(bufnr, refog_diag_ns, diags, fluxtags.utils.set_diagnostics)
         end,
     })
 
@@ -59,34 +90,6 @@ function M.register(fluxtags)
         conceal_open = opts.conceal_open,
         conceal_close = opts.conceal_close,
     })
-
-    function kind:apply_diagnostics(bufnr, lines, is_disabled)
-        local tags, diags = fluxtags.utils.load_tagfile(og_kind_name), {}
-
-        for lnum, line in ipairs(lines) do
-            for match_start, name in line:gmatch("()" .. opts.pattern) do
-                local prefix_start, prefix_text = prefix_util.find_prefix(line, match_start, opts.comment_prefix_patterns)
-                local col0 = prefix_start - 1
-                local name_col0 = col0 + #prefix_text + #opts.open
-                local name_end = name_col0 + #name
-
-                if not (is_disabled and is_disabled(lnum - 1, col0)) and (not tags[name] or #tags[name] == 0) then
-                    diag.push(
-                        diags,
-                        bufnr,
-                        lnum - 1,
-                        name_col0,
-                        name_end,
-                        vim.diagnostic.severity.WARN,
-                        "fluxtags.refog",
-                        "Undefined og tag: " .. name
-                    )
-                end
-            end
-        end
-
-        diag.publish(bufnr, refog_diag_ns, diags, fluxtags.utils.set_diagnostics)
-    end
 
     fluxtags.register_kind(kind)
 end

@@ -200,8 +200,43 @@ end
 ---@param bufnr integer
 ---@return boolean
 function App:should_process_buf(bufnr)
+    if not vim.api.nvim_buf_is_valid(bufnr) then
+        return false
+    end
+
     local ft, bt = vim.bo[bufnr].filetype, vim.bo[bufnr].buftype
     if bt == "terminal" or BUILTIN_FILETYPE_EXCLUDES[ft] then return false end
+
+    local filepath = vim.api.nvim_buf_get_name(bufnr)
+    if filepath == "" then
+        return false
+    end
+
+    local wins = vim.fn.win_findbuf(bufnr)
+    if #wins > 0 then
+        local has_non_float = false
+        for _, winid in ipairs(wins) do
+            if vim.api.nvim_win_is_valid(winid) then
+                local cfg = vim.api.nvim_win_get_config(winid)
+                if cfg.relative == nil or cfg.relative == "" then
+                    has_non_float = true
+                    break
+                end
+            end
+        end
+        if not has_non_float then
+            return false
+        end
+    end
+
+    local curwin = vim.api.nvim_get_current_win()
+    if vim.api.nvim_win_is_valid(curwin) and vim.api.nvim_win_get_buf(curwin) == bufnr then
+        local cfg = vim.api.nvim_win_get_config(curwin)
+        if cfg.relative ~= nil and cfg.relative ~= "" then
+            return false
+        end
+    end
+
     if ft == "" then return true end
     local deny = self.config.filetypes_exc or self.config.filetypes_ignore
     if in_list(deny, ft) then return false end
@@ -210,9 +245,22 @@ function App:should_process_buf(bufnr)
 end
 
 ---@param kind TagKind
+---@return boolean
 function App:register_kind(kind)
-    if not self.tag_kinds[kind.name] then table.insert(self.kind_order, kind.name) end
-    self.tag_kinds[kind.name] = kind
+    if type(kind) ~= "table" then
+        vim.notify("fluxtags.register_kind: expected kind object, got " .. type(kind), vim.log.levels.ERROR)
+        return false
+    end
+
+    local kind_name = kind.name
+    if type(kind_name) ~= "string" or kind_name == "" then
+        vim.notify("fluxtags.register_kind: kind.name must be a non-empty string, skipping registration", vim.log.levels.ERROR)
+        return false
+    end
+
+    if not self.tag_kinds[kind_name] then table.insert(self.kind_order, kind_name) end
+    self.tag_kinds[kind_name] = kind
+    return true
 end
 
 ---@param kind_name string
@@ -372,7 +420,14 @@ function App:redraw_extmarks(bufnr)
     end
 end
 
+---@return nil
 function App:jump_to_tag()
+    local bufnr = vim.api.nvim_get_current_buf()
+    if not self:should_process_buf(bufnr) then
+        pcall(vim.cmd, "normal! \x1d")
+        return
+    end
+
     local line, col = vim.api.nvim_get_current_line(), vim.fn.col(".")
     for kind_name, kind in self:ordered_kinds() do
         local name, s, e = kind:find_at_cursor(line, col)
@@ -380,7 +435,7 @@ function App:jump_to_tag()
             if kind.on_jump(name, {
                 line = line,
                 col = col,
-                bufnr = vim.api.nvim_get_current_buf(),
+                bufnr = bufnr,
                 kind_name = kind_name,
                 utils = self.utils,
             }) then
@@ -474,11 +529,14 @@ end
 
 ---@param bufnr integer
 function App:schedule_refresh(bufnr)
-    if not vim.api.nvim_buf_is_valid(bufnr) or vim.b[bufnr].fluxtags_refresh_scheduled then return end
+    if not self:should_process_buf(bufnr) or vim.b[bufnr].fluxtags_refresh_scheduled then return end
     vim.b[bufnr].fluxtags_refresh_scheduled = true
 
     vim.defer_fn(function()
-        if not vim.api.nvim_buf_is_valid(bufnr) then return end
+        if not self:should_process_buf(bufnr) then
+            vim.b[bufnr].fluxtags_refresh_scheduled = false
+            return
+        end
         vim.b[bufnr].fluxtags_refresh_scheduled = false
         self:setup_buffer(bufnr, true)
         if not vim.bo[bufnr].modified then self:update_tags(true, bufnr) end
@@ -508,14 +566,41 @@ M.config = app.config
 M.utils = app.utils
 M.tag_cache = app.tag_cache
 M.tag_kinds = app.tag_kinds
+
+---@param kind_name string
+---@return table<string, {file:string, lnum:number, col?:number}[]>
 M.load_tagfile = function(kind_name) return app:load_tagfile(kind_name) end
+
+---@param kind_name string
+---@return integer
 M.prune_tagfile = function(kind_name) return app:prune_tagfile(kind_name) end
+
+---@param kind_name string
+---@return table<string, {file:string, lnum:number, col?:number}[]>
 M.load_tags = function(kind_name) return app:load_tags(kind_name) end
+
+---@return integer
 M.load_all_tags = function() return app:load_all_tags() end
+
+---@param kind TagKind
+---@return nil
 M.register_kind = function(kind) return app:register_kind(kind) end
+
+---@return nil
 M.jump_to_tag = function() return app:jump_to_tag() end
+
+---@param silent boolean
+---@param bufnr? integer
+---@return nil
 M.update_tags = function(silent, bufnr) return app:update_tags(silent, bufnr) end
+
+---@param bufnr? integer
+---@param force? boolean
+---@return nil
 M.setup_buffer = function(bufnr, force) return app:setup_buffer(bufnr, force) end
+
+---@param opts? Config
+---@return nil
 M.setup = function(opts)
     app:setup(opts)
     M.config = app.config

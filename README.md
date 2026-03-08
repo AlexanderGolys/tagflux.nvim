@@ -4,7 +4,7 @@ A lightweight tagging system for Neovim that lets you create marks, references, 
 
 ## Features
 
-- **7 tag types** — marks, references, links, hashtags, inline highlights, and buffer directives
+- **7 tag types** — mark, ref, refog, bib, og, hl, and cfg
 - **Cross-file navigation** — jump between tags using Ctrl-]
 - **Smart picker** — when a tag has multiple locations, choose which one to visit
 - **Parent tag resolution** — `@config.defaults` automatically resolves to `@config`
@@ -231,18 +231,22 @@ require("fluxtags").setup({
 
 ## Commands
 
-| Command            | What it does |
-|-------------------|--------------|
-| `:FTagsUpdate`    | Save tags from current file |
-| `:FTagsList [type]` | Open picker of all saved tags |
-| `:FTagsLoad`      | Reload tag database from disk |
-| `:FTagsPrune`     | Remove deleted/stale tags |
-| `:FTagsClear`     | Delete all saved tags |
-| `:FTagsHL`        | Redraw tag highlights in current file |
-| `:FTagsHi`        | Reapply highlight colors |
-| `:FTagsDebug`     | Show tag info under cursor |
-| `:FTagsCfgList`   | List buffer directive options |
-| `:FTagsPreview [type]` | Show tag syntax examples |
+| Command | What it does |
+|---|---|
+| `:FTagsUpdate` | Scan and persist tags from current buffer |
+| `:FTagsSave` | Alias for `:FTagsUpdate` |
+| `:FTagsLoad` | Reload tagfiles into memory |
+| `:FTagsList [kind]` | Open picker of all saved tags (optional kind filter) |
+| `:FTagsCfgList` | List all registered cfg directive keys and descriptions |
+| `:FTagsPreview [kind]` | Show tag syntax examples |
+| `:FTagsTree [file]` | Generate a project tree of marks and og tags in a temp file or notify output |
+| `:FTagsPrune` | Remove stale/deleted tags from all tagfiles |
+| `:FTagsClear` | Truncate all saved tagfiles |
+| `:FTagsHL` | Reapply tag extmarks in current buffer |
+| `:FTagsHi` | Re-link default FluxTag highlight groups |
+| `:FTagsDebug` | Show matched kind info under cursor |
+| `:FTagsDebugMarks` | Show all fluxtags extmarks in current buffer |
+| `:FTagsDebugAtCursor` | Show extmarks covering cursor position |
 
 ---
 
@@ -257,6 +261,31 @@ Press **Ctrl-]** to jump to a tag under your cursor.
 3. If it's a **hashtag** → shows a picker of all occurrences
 4. If it's a **link** → opens in browser/file manager/help
 5. If it's **highlight/config** → no action
+
+---
+
+## Configuration reference
+
+### Core options
+
+- `filetypes_whitelist` — include only these filetypes (empty/nil = all)
+- `filetypes_ignore` — skip listed filetypes
+- `filetypes_inc` / `filetypes_exc` — preferred aliases for include/exclude
+- `highlights` — override any `FluxTag*` highlight group
+- `kinds` — per-kind overrides (`mark`, `ref`, `refog`, `bib`, `og`, `hl`, `cfg`)
+
+### Cfg directives
+
+The built-in directives are:
+
+- `ft(value)` — set buffer filetype
+- `conceallevel(value)` — set `conceallevel` on windows containing the buffer
+- `fluxtags(off)` — disable fluxtags in the buffer
+- `fluxtags_hl(off/on)` — disable/enable fluxtags highlights in regions
+- `fluxtags_reg(off/on)` — disable/enable tag registration in regions
+- `modeline(cmd)` — run any Ex command
+
+Use `:FTagsCfgList` to print the current list (including descriptions).
 
 If nothing matches, Neovim's default tag behavior kicks in.
 

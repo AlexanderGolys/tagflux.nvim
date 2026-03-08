@@ -3,28 +3,32 @@
 --- @brief ]]
 
 local prefixed = require("tagkinds.prefixed_kind")
-local picker_util = require("fluxtags.picker")
 local prefix_util = require("fluxtags.prefix")
 local kind_common = require("fluxtags.common")
+local Runtime = require("tagkinds.runtime")
 
 local M = {}
 
+--- Register the `og` hashtag tag kind.
+---
+--- Saved occurrences are available through :FTagsList and `@##name` / hashtag
+--- jump flows through `Ctrl-]`.
+---
 ---@param fluxtags table
+---@return nil
+
 function M.register(fluxtags)
+    local runtime = Runtime.new(fluxtags)
     local binder = prefixed.binder(fluxtags, "og", {
         name = "og",
-        pattern = "@##([%w_%.%-%+%*/%\\:]+)",
+        pattern = " @##([%w_%.%-%+%*/%\\:]+)",
         hl_group = "FluxTagOg",
-        open = "@##",
+        open = " @##",
         conceal_open = "#",
     })
     local opts = binder.opts
 
-    local kind = binder:new_kind({
-        name = opts.name,
-        pattern = opts.pattern,
-        hl_group = opts.hl_group,
-        priority = opts.priority,
+    local kind = binder:kind_builder({
         save_to_tagfile = true,
         is_valid = kind_common.is_valid_name,
         conceal_pattern = function(name)
@@ -34,14 +38,7 @@ function M.register(fluxtags)
             }
         end,
         on_jump = function(name, ctx)
-            local tags = ctx.utils.load_tagfile(ctx.kind_name)
-            local entries = tags[name]
-            if not entries or #entries == 0 then
-                vim.notify("No tags found: #" .. name, vim.log.levels.WARN)
-                return true
-            end
-            picker_util.pick_locations(entries, "#" .. name, ctx)
-            return true
+            return runtime:pick_tag_locations(ctx.kind_name, name, ctx, "No tags found: #", "#")
         end,
     })
 

@@ -40,7 +40,7 @@ end
 --- Called on load, VimEnter, and ColorScheme to survive theme changes.
 local function link_default_highlights()
     vim.api.nvim_set_hl(0, "FluxTagMarks", { bold = true, fg = "#FF97Aa", underline = false, nocombine = true }) 
-    vim.api.nvim_set_hl(0, "FluxTagRef",   { italic = true, bold = true ,  fg = "#cfbbfb", nocombine = true  })
+    vim.api.nvim_set_hl(0, "FluxTagRef",   { link = "NeogitDiffDeleteHighlight", nocombine = true  })
     vim.api.nvim_set_hl(0, "FluxTagOg",    { bold = true, fg = "#F9e2af" })
     vim.api.nvim_set_hl(0, "FluxTagRefog", { underline = true, bg = "#FFD946", fg = "#FFF9DC" })
     vim.api.nvim_set_hl(0, "FluxTagCfg",   { fg = "#C2F397" })
@@ -49,7 +49,6 @@ local function link_default_highlights()
 end
 
 link_default_highlights()
-
 
 --- Re-apply default highlight group links, optionally overriding with user config.
 --- Exposed so autocmds and commands can call it without reaching into the closure.

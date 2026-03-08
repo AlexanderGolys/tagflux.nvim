@@ -1,6 +1,17 @@
 local M = {}
 local Extmark = require("fluxtags.extmark")
 
+---@class FluxtagsDiagnostic
+---@field bufnr number
+---@field lnum number
+---@field col number
+---@field end_col number
+---@field severity integer
+---@field source string
+---@field message string
+
+--- Push a single diagnostic entry into a list.
+---
 ---@param diags vim.Diagnostic[]
 ---@param bufnr number
 ---@param lnum number
@@ -21,6 +32,8 @@ function M.push(diags, bufnr, lnum, col, end_col, severity, source, message)
     })
 end
 
+--- Publish diagnostics to a namespace.
+---
 ---@param bufnr number
 ---@param ns number
 ---@param diags vim.Diagnostic[]
@@ -29,6 +42,8 @@ function M.publish(bufnr, ns, diags, set_diagnostics)
     set_diagnostics(bufnr, ns, diags)
 end
 
+--- Place a temporary error extmark used by validators.
+---
 ---@param bufnr number
 ---@param ns number
 ---@param lnum number
