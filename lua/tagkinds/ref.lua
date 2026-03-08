@@ -5,12 +5,11 @@
 -- @@@fluxtags.ref
 
 
-local prefixed = require("tagkinds.prefixed_kind")
+local prefixed = require("fluxtags.prefixed_kind")
 local kind_common = require("fluxtags.common")
 local prefix_util = require("fluxtags.prefix")
-local diag = require("tagkinds.diagnostics")
+local support = require("fluxtags.kind_support")
 local Extmark = require("fluxtags.extmark")
-local Runtime = require("tagkinds.runtime")
 
 local M = {}
 
@@ -36,7 +35,7 @@ end
 ---@param fluxtags table
 ---@return nil
 function M.register(fluxtags)
-    local runtime = Runtime.new(fluxtags)
+    local runtime = support.new_runtime(fluxtags)
     local marks_cfg = (fluxtags.config.kinds and fluxtags.config.kinds.mark) or {}
     local binder = prefixed.binder(fluxtags, "ref", {
         name = "ref",
@@ -133,7 +132,7 @@ function M.register(fluxtags)
                 end)
             end
 
-            diag.publish(bufnr, ref_diag_ns, diags, fluxtags.utils.set_diagnostics)
+            support.publish_diags(bufnr, ref_diag_ns, diags, fluxtags.utils.set_diagnostics)
         end,
     })
 

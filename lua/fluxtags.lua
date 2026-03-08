@@ -9,7 +9,9 @@
 
 local config_mod = require("fluxtags_config")
 local Path = require("fluxtags.path")
+local kind_registry = require("tagkinds.registry")
 
+-- @@@fluxtags
 local M = {}
 
 --- @class Config
@@ -154,6 +156,7 @@ function App.new()
         diag_ns = vim.api.nvim_create_namespace("fluxtags_diag"),
         tag_kinds = {},
         kind_order = {},
+        kind_registry = kind_registry.builtins(),
         tag_cache = {},
     }, App)
 
@@ -548,13 +551,7 @@ function App:setup(opts)
     self.config = normalize_config(vim.tbl_deep_extend("force", self.config, opts or {}))
     config_mod.setup_default_highlights(self.config.highlights)
 
-    require("tagkinds.mark").register(M)
-    require("tagkinds.ref").register(M)
-    require("tagkinds.refog").register(M)
-    require("tagkinds.bib").register(M)
-    require("tagkinds.og").register(M)
-    require("tagkinds.hl").register(M)
-    require("tagkinds.cfg").register(M)
+    self.kind_registry:register_all(M)
 
     require("fluxtags.autocmds").setup(M, function(bufnr) self:schedule_refresh(bufnr) end)
     require("fluxtags.commands").setup(M)

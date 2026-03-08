@@ -4,7 +4,7 @@
 
 -- @@@fluxtags.bib
 
-local prefixed = require("tagkinds.prefixed_kind")
+local prefixed = require("fluxtags.prefixed_kind")
 
 local M = {}
 

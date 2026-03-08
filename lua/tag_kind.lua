@@ -53,24 +53,6 @@ local Extmark = require("fluxtags.extmark")
 ---@field find_at_cursor? fun(self: TagKind, line: string, col: number): string?, number?, number?
 ---@field get_disabled_intervals? fun(self: TagKind, lines: string[], directive_name: string): table[]
 
----@class TagKindOptions
----@field name TagKindName
----@field pattern TagKindPattern
----@field hl_group? string
----@field conceal_pattern? fun(name: string): ConcealSpec[]
----@field save_to_tagfile? boolean
----@field tagfile? string
----@field priority? number
----@field on_jump? fun(name: string, ctx: table): boolean
----@field on_enter? fun(bufnr: number, lines: string[])
----@field extract_name? fun(capture: string): string
----@field is_valid? fun(name: string): boolean
----@field apply_extmarks? fun(self: TagKind, bufnr: number, lnum: number, line: string, ns: number, is_disabled?: fun(lnum: number, col: number): boolean)
----@field apply_diagnostics? fun(self: TagKind, bufnr: number, lines: string[], is_disabled?: fun(lnum: number, col: number): boolean)
----@field collect_tags? fun(self: TagKind, filepath: string, lines: string[], is_disabled?: fun(lnum: number, col: number): boolean): table[]
----@field find_at_cursor? fun(self: TagKind, line: string, col: number): string?, number?, number?
----@field get_disabled_intervals? fun(self: TagKind, lines: string[], directive_name: string): table[]
-
 --- @class TagKindBuilder
 --- @field _opts TagKindOptions
 

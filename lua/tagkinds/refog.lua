@@ -2,11 +2,10 @@
 --- refog — references to og tags.
 --- @brief ]]
 
-local prefixed = require("tagkinds.prefixed_kind")
+local prefixed = require("fluxtags.prefixed_kind")
 local kind_common = require("fluxtags.common")
-local diag = require("tagkinds.diagnostics")
 local prefix_util = require("fluxtags.prefix")
-local Runtime = require("tagkinds.runtime")
+local support = require("fluxtags.kind_support")
 
 local M = {}
 
@@ -19,7 +18,7 @@ local M = {}
 ---@return nil
 
 function M.register(fluxtags)
-    local runtime = Runtime.new(fluxtags)
+    local runtime = support.new_runtime(fluxtags)
     local og_cfg = (fluxtags.config.kinds and fluxtags.config.kinds.og) or {}
     local binder = prefixed.binder(fluxtags, "refog", {
         name = "refog",
@@ -79,7 +78,7 @@ function M.register(fluxtags)
                 end
             end
 
-            diag.publish(bufnr, refog_diag_ns, diags, fluxtags.utils.set_diagnostics)
+            support.publish_diags(bufnr, refog_diag_ns, diags, fluxtags.utils.set_diagnostics)
         end,
     })
 
