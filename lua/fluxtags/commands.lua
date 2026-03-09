@@ -21,6 +21,18 @@ local PREVIEW_KINDS = { "mark", "ref", "refog", "bib", "og", "hl", "cfg" }
 
 local KIND_SYMBOLS = { mark = "@", ref = "&", refog = "#", og = "#", cfg = "$", hl = "%", bib = "/" }
 
+---@return table|nil
+local function snacks_picker()
+  if _G.Snacks and _G.Snacks.picker then
+    return _G.Snacks.picker
+  end
+  local ok_snacks, snacks = pcall(require, "snacks")
+  if ok_snacks and snacks and snacks.picker then
+    return snacks.picker
+  end
+  return nil
+end
+
 ---@param kind string
 ---@return boolean
 local function notify_kind_help(kind)
@@ -52,31 +64,17 @@ end
 ---@param items {text:string, ordinal?:string}[]
 ---@return boolean
 local function pick_static_items(title, items)
-  local ok_telescope, pickers = pcall(require, "telescope.pickers")
-  if not ok_telescope then
+  local picker = snacks_picker()
+  if not (picker and picker.select) then
     return false
   end
 
-  local finders = require("telescope.finders")
-  local conf = require("telescope.config").values
-  local actions = require("telescope.actions")
-
-  pickers.new({}, {
-    prompt_title = title,
-    finder = finders.new_table({
-      results = items,
-      entry_maker = function(entry)
-        return { value = entry, display = entry.text, ordinal = entry.ordinal or entry.text }
-      end,
-    }),
-    sorter = conf.generic_sorter({}),
-    attach_mappings = function(prompt_bufnr)
-      actions.select_default:replace(function()
-        actions.close(prompt_bufnr)
-      end)
-      return true
+  picker.select(items, {
+    title = title,
+    format_item = function(entry)
+      return entry.text
     end,
-  }):find()
+  }, function() end)
 
   return true
 end
@@ -114,54 +112,31 @@ end
 ---@param entries table[]
 ---@param on_confirm fun(entry: table)
 local function pick_tag_entries(title, entries, on_confirm)
-  local ok_telescope, telescope = pcall(require, "telescope.pickers")
-  if ok_telescope then
-    local finders = require("telescope.finders")
-    local conf = require("telescope.config").values
-    local actions = require("telescope.actions")
-    local action_state = require("telescope.actions.state")
-    local previewers = require("telescope.previewers")
-
-    telescope.new({}, {
-      prompt_title = title,
-      finder = finders.new_table({
-        results = entries,
-        entry_maker = function(entry)
-          return {
-            value = entry,
-            display = entry.text,
-            ordinal = entry.kind .. entry.name .. entry.file .. entry.lnum,
-          }
-        end,
-      }),
-      previewer = previewers.new_buffer_previewer({
-        define_preview = function(self, entry)
-          conf.buffer_previewer_maker(entry.value.file, self.state.bufnr, { bufname = self.state.bufname })
-          vim.api.nvim_buf_call(self.state.bufnr, function()
-            vim.fn.cursor(entry.value.lnum, 1)
-          end)
-        end,
-      }),
-      sorter = conf.generic_sorter({}),
-      attach_mappings = function(prompt_bufnr)
-        actions.select_default:replace(function()
-          actions.close(prompt_bufnr)
-          local selection = action_state.get_selected_entry()
-          if selection and selection.value then
-            on_confirm(selection.value)
-          end
-        end)
-        return true
+  local picker = snacks_picker()
+  if picker and picker.select then
+    picker.select(entries, {
+      title = title,
+      format_item = function(entry)
+        return entry.text
       end,
-    }):find()
+    }, function(choice)
+      if choice then
+        on_confirm(choice)
+      end
+    end)
     return
   end
 
-  local lines = {}
-  for _, entry in ipairs(entries) do
-    table.insert(lines, entry.text)
-  end
-  vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+  vim.ui.select(entries, {
+    prompt = title,
+    format_item = function(entry)
+      return entry.text
+    end,
+  }, function(choice)
+    if choice then
+      on_confirm(choice)
+    end
+  end)
 end
 
 ---@param fluxtags table
@@ -331,6 +306,7 @@ function Commands:_register(name, callback, opts)
   vim.api.nvim_create_user_command(name, callback, opts)
 end
 
+---@param self FluxtagsCommands
 ---@return table
 function Commands:_pickable_kinds()
   local kinds = {}
@@ -343,31 +319,48 @@ function Commands:_pickable_kinds()
   return kinds
 end
 
+---@param self FluxtagsCommands
+---@param message string
+---@return nil
 function Commands:_notify_info(message)
   vim.notify(message, vim.log.levels.INFO)
 end
 
+---@param self FluxtagsCommands
+---@param message string
+---@return nil
 function Commands:_notify_error(message)
   vim.notify(message, vim.log.levels.ERROR)
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:_update_tags()
   self.fluxtags.update_tags(false)
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:_load_all()
   local total = self.fluxtags.load_all_tags()
   self:_notify_info(total > 0 and ("Loaded %d tags"):format(total) or "No tags")
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:_reapply_buffer_highlights()
   self.setup_buffer(nil, true)
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:_relink_highlights()
   self.config_mod.setup_default_highlights(self.fluxtags.config.highlights)
 end
 
+---@param self FluxtagsCommands
+---@param opts vim.api.keyset.user_command
+---@return nil
 function Commands:_list_tags(opts)
   local kind_filter = opts.args ~= "" and opts.args or nil
   if kind_filter and not self.tag_kinds[kind_filter] then
@@ -387,6 +380,8 @@ function Commands:_list_tags(opts)
   end)
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:_cfg_list()
   local directives = require("tagkinds.cfg").get_directives_info()
   if #directives == 0 then
@@ -413,6 +408,9 @@ function Commands:_cfg_list()
   self:_notify_info(table.concat(lines, "\n"))
 end
 
+---@param self FluxtagsCommands
+---@param opts vim.api.keyset.user_command
+---@return nil
 function Commands:_preview(opts)
   local kind = opts.args ~= "" and opts.args or nil
   if kind then
@@ -432,6 +430,9 @@ function Commands:_preview(opts)
   self:_notify_info(table.concat(lines, "\n"))
 end
 
+---@param self FluxtagsCommands
+---@param opts vim.api.keyset.user_command
+---@return nil
 function Commands:_tree(opts)
   if not self.load_tagfile then
     return
@@ -439,6 +440,8 @@ function Commands:_tree(opts)
   generate_tree(self.load_tagfile, opts.args ~= "" and opts.args or nil)
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:_clear()
   local cleared = 0
   for _, kind in pairs(self.tag_kinds) do
@@ -450,6 +453,8 @@ function Commands:_clear()
   self:_notify_info(("Cleared %d tagfiles"):format(cleared))
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:_prune()
   local removed = 0
   for kind_name, kind in pairs(self.tag_kinds) do
@@ -460,15 +465,20 @@ function Commands:_prune()
   self:_notify_info(("Removed %d stale tag entries"):format(removed))
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:_setup_debug_commands()
   setup_debug_commands(self.ns, self.tag_kinds)
 end
 
+---@param self FluxtagsCommands
+---@return nil
 function Commands:setup_keymap()
   vim.keymap.set("n", "<C-]>", self.fluxtags.jump_to_tag, { desc = "Jump to fluxtag under cursor" })
 end
 
----@param fluxtags table
+---@param self FluxtagsCommands
+---@return nil
 function Commands:setup()
   self:_register("FTagsUpdate", function()
     self:_update_tags()

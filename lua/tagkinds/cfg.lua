@@ -2,6 +2,8 @@
 --- cfg — buffer configuration directives.
 --- @brief ]]
 
+-- @@@fluxtags.cfg
+
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")
 local kind_common = require("fluxtags.common")

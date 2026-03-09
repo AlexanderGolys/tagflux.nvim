@@ -21,7 +21,7 @@ function M.register(fluxtags)
         pattern = " ///([%.%-/:%w]+)",
         hl_group = "FluxTagBib",
         open = " ///",
-        conceal_open = " /",
+        conceal_open = "/",
     })
     local opts = binder.opts
 

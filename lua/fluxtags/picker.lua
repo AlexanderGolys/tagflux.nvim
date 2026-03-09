@@ -2,6 +2,18 @@ local M = {}
 local Path = require("fluxtags.path")
 local path_utils = Path.new()
 
+---@return table|nil
+local function snacks_picker()
+    if _G.Snacks and _G.Snacks.picker then
+        return _G.Snacks.picker
+    end
+    local ok_snacks, snacks = pcall(require, "snacks")
+    if ok_snacks and snacks and snacks.picker then
+        return snacks.picker
+    end
+    return nil
+end
+
 ---@param entry table
 ---@param ctx table
 local function jump_to_entry(entry, ctx)
@@ -13,46 +25,18 @@ end
 ---@param title string
 ---@param ctx table
 function M.pick_locations(entries, title, ctx)
-    local ok_telescope, telescope = pcall(require, "telescope.pickers")
-    if ok_telescope then
-        local finders = require("telescope.finders")
-        local conf = require("telescope.config").values
-        local actions = require("telescope.actions")
-        local action_state = require("telescope.actions.state")
-        local previewers = require("telescope.previewers")
-
-        telescope.new({}, {
-            prompt_title = title,
-            finder = finders.new_table({
-                results = entries,
-                entry_maker = function(entry)
-                    return {
-                        value = entry,
-                        display = string.format("%s:%d", path_utils:display_relative(entry.file), entry.lnum),
-                        ordinal = entry.file .. entry.lnum,
-                    }
-                end,
-            }),
-            previewer = previewers.new_buffer_previewer({
-                define_preview = function(self, entry)
-                    conf.buffer_previewer_maker(entry.value.file, self.state.bufnr, {
-                        bufname = self.state.bufname,
-                    })
-                    vim.api.nvim_buf_call(self.state.bufnr, function()
-                        vim.fn.cursor(entry.value.lnum, entry.value.col or 1)
-                    end)
-                end,
-            }),
-            sorter = conf.generic_sorter({}),
-            attach_mappings = function(prompt_bufnr)
-                actions.select_default:replace(function()
-                    actions.close(prompt_bufnr)
-                    local selection = action_state.get_selected_entry()
-                    jump_to_entry(selection.value, ctx)
-                end)
-                return true
+    local picker = snacks_picker()
+    if picker and picker.select then
+        picker.select(entries, {
+            title = title,
+            format_item = function(entry)
+                return string.format("%s:%d", path_utils:display_relative(entry.file), entry.lnum)
             end,
-        }):find()
+        }, function(choice)
+            if choice then
+                jump_to_entry(choice, ctx)
+            end
+        end)
         return
     end
 
@@ -64,6 +48,8 @@ function M.pick_locations(entries, title, ctx)
     }, function(choice)
         if choice then
             jump_to_entry(choice, ctx)
+        else
+            vim.notify("Snacks picker not available", vim.log.levels.WARN)
         end
     end)
 end

@@ -188,10 +188,10 @@ require("fluxtags").setup()
 ```config
 require("fluxtags").setup({
   -- Limit tags to specific filetypes (empty/nil = all filetypes)
-  filetypes_whitelist = nil,
+  filetypes_inc = nil,
   
   -- Skip these filetypes
-  filetypes_ignore = {},
+  filetypes_exc = {},
   
   -- Override highlight colors
   highlights = {
@@ -201,6 +201,13 @@ require("fluxtags").setup({
   -- Per-tag-type customization
   kinds = {
     -- mark = { hl_group = "MyMarkColor" },
+  },
+
+  -- Startup behavior
+  startup = {
+    setup_buffer = true, -- initialize current buffer on setup()
+    update_tags = false, -- run a silent initial save pass
+    load_tags = false,   -- preload tagfiles into memory
   },
 })
 ```
@@ -273,6 +280,9 @@ Press **Ctrl-]** to jump to a tag under your cursor.
 - `filetypes_inc` / `filetypes_exc` — preferred aliases for include/exclude
 - `highlights` — override any `FluxTag*` highlight group
 - `kinds` — per-kind overrides (`mark`, `ref`, `refog`, `bib`, `og`, `hl`, `cfg`)
+- `startup.setup_buffer` — run `setup_buffer()` for current buffer during `setup()` (default `true`)
+- `startup.update_tags` — run an initial silent `update_tags()` during `setup()` (default `false`)
+- `startup.load_tags` — load all tagfiles during `setup()` (default `false`)
 
 ### Cfg directives
 
@@ -330,7 +340,7 @@ You can disable this simplification by setting `conceallevel=0` in a file or via
 - Verify it's not in `filetypes_ignore`
 
 **Picker won't open?**
-- Install telescope.nvim for better pickers
+- Install snacks.nvim for better pickers
 - Falls back to basic Neovim menu otherwise
 
 **Tags not saving across sessions?**

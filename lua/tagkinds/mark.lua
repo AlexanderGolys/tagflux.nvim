@@ -2,13 +2,39 @@
 --- mark — named anchor tags.
 --- @brief ]]
 
+-- @@@fluxtags.mark
+
 local prefixed = require("fluxtags.prefixed_kind")
 local kind_common = require("fluxtags.common")
 local prefix_util = require("fluxtags.prefix")
 local jump_util = require("fluxtags.jump")
 local support = require("fluxtags.kind_support")
+local Extmark = require("fluxtags.extmark")
 
 local M = {}
+
+local MARK_NAME_PATTERN = kind_common.NAME_CHARS
+
+---@param line string
+---@param match_start number
+---@return boolean
+local function has_valid_mark_boundary(line, match_start)
+    return true
+end
+
+---@param line string
+---@param prefix_patterns string[]
+---@param marker_start number
+---@param name string
+---@param callback fun(prefix_start:number, prefix_text:string)
+local function for_each_mark_match(line, prefix_patterns, marker_start, name, callback)
+    local prefix_start, prefix_text = prefix_util.find_prefix(line, marker_start, prefix_patterns)
+    local has_prefix = prefix_start < marker_start
+    if not has_prefix and not has_valid_mark_boundary(line, marker_start) then
+        return
+    end
+    callback(prefix_start, prefix_text)
+end
 
 --- Register the `mark` anchor kind.
 ---
@@ -21,17 +47,13 @@ function M.register(fluxtags)
     local runtime = support.new_runtime(fluxtags)
     local binder = prefixed.binder(fluxtags, "mark", {
         name = "mark",
-        pattern = " @@@([%w_.%-%+%*/\\:]+)",
+        pattern = "@@@(" .. MARK_NAME_PATTERN .. ")",
         hl_group = "FluxTagMarks",
-        open = " @@@",
+        open = "@@@",
         conceal_open = "@",
     })
     local opts = binder.opts
     local mark_diag_ns = fluxtags.utils.make_diag_ns("mark")
-    local conceal_hl_group = opts.hl_group .. "Conceal"
-    local base_hl = vim.api.nvim_get_hl(0, { name = opts.hl_group })
-    base_hl.underline = false
-    vim.api.nvim_set_hl(0, conceal_hl_group, base_hl)
     local kind = binder:new_kind({
         name = opts.name,
         pattern = opts.pattern,
@@ -41,7 +63,7 @@ function M.register(fluxtags)
         is_valid = kind_common.is_valid_name,
         conceal_pattern = function(name)
             return {
-                { offset = 0, length = #opts.open, char = opts.conceal_open, hl_group = conceal_hl_group },
+                { offset = 0, length = #opts.open, char = opts.conceal_open, hl_group = opts.hl_group },
                 { offset = #opts.open, length = #name, hl_group = opts.hl_group },
             }
         end,
@@ -49,9 +71,16 @@ function M.register(fluxtags)
             return runtime:jump_to_first(ctx.kind_name, name, ctx, "Tag not found: ")
         end,
         find_at_cursor = function(self, line, col)
-            local name, s, e = prefix_util.find_tag_at_cursor(line, col, opts.pattern, opts.comment_prefix_patterns or {})
-            if name then
-                return name, s, e
+            for match_start, name in line:gmatch("()" .. opts.pattern) do
+                local marker_start = tonumber(match_start)
+                local prefix_start, prefix_text = prefix_util.find_prefix(line, marker_start, opts.comment_prefix_patterns or {})
+                if prefix_start < marker_start or has_valid_mark_boundary(line, marker_start) then
+                    local marker_end = marker_start + 2 + #name
+                    local start_col = prefix_start
+                    if col >= start_col and col <= marker_end then
+                        return name, start_col, marker_end
+                    end
+                end
             end
 
             local inline_name, inline_s, inline_e = prefix_util.find_match_at_cursor(line, col, kind_common.INLINE_SUBTAG_PATTERN)
@@ -60,12 +89,28 @@ function M.register(fluxtags)
             end
         end,
         apply_extmarks = function(self, bufnr, lnum, line, ns, is_disabled)
-            prefix_util.apply_prefixed_extmarks(bufnr, ns, lnum, line, opts.pattern, opts.comment_prefix_patterns or {}, {
-                open = opts.open,
-                conceal_open = opts.conceal_open,
-                hl_group = self.hl_group,
-                priority = self.priority,
-            }, is_disabled)
+            for match_start, name in line:gmatch("()" .. opts.pattern) do
+                for_each_mark_match(line, opts.comment_prefix_patterns or {}, tonumber(match_start), name, function(prefix_start, prefix_text)
+                    local col0 = prefix_start - 1
+                    local open_len = #prefix_text + #opts.open
+                    if not (is_disabled and is_disabled(lnum, col0)) then
+                        local open_end = col0 + open_len
+                        local name_start = open_end
+                        local name_end = name_start + #name
+                        Extmark.place(bufnr, ns, lnum, col0, {
+                            end_col = open_end,
+                            conceal = opts.conceal_open,
+                            hl_group = self.hl_group,
+                            priority = self.priority,
+                        })
+                        Extmark.place(bufnr, ns, lnum, name_start, {
+                            end_col = name_end,
+                            hl_group = self.hl_group,
+                            priority = self.priority,
+                        })
+                    end
+                end)
+            end
         end,
         apply_diagnostics = function(self, bufnr, lines, is_disabled)
             ---@type table<string, {lnum:number, col:number, prefix_len:number}[]>
@@ -73,8 +118,7 @@ function M.register(fluxtags)
 
             for lnum, line in ipairs(lines) do
                 for match_start, name in line:gmatch("()" .. opts.pattern) do
-                    if name:match("^[%w_.%-%+%*%/%\\:]+$") then
-                        local prefix_start, prefix_text = prefix_util.find_prefix(line, tonumber(match_start), opts.comment_prefix_patterns or {})
+                    for_each_mark_match(line, opts.comment_prefix_patterns or {}, tonumber(match_start), name, function(prefix_start, prefix_text)
                         ---@cast prefix_start number
                         ---@cast prefix_text string
                         occurrences[name] = occurrences[name] or {}
@@ -83,7 +127,7 @@ function M.register(fluxtags)
                             col = prefix_start - 1,
                             prefix_len = #prefix_text,
                         })
-                    end
+                    end)
                 end
             end
             for name, locs in pairs(occurrences) do
@@ -106,6 +150,28 @@ function M.register(fluxtags)
                 end
             end
             support.publish_diags(bufnr, mark_diag_ns, diags, fluxtags.utils.set_diagnostics)
+        end,
+        collect_tags = function(self, filepath, lines, is_disabled)
+            local tags = {}
+
+            for lnum, line in ipairs(lines) do
+                for match_start, name in line:gmatch("()" .. opts.pattern) do
+                    for_each_mark_match(line, opts.comment_prefix_patterns or {}, tonumber(match_start), name, function(prefix_start, prefix_text)
+                        local col0 = prefix_start - 1
+                        local is_disabled_tag = is_disabled and is_disabled(lnum - 1, col0)
+                        if not is_disabled_tag then
+                            table.insert(tags, {
+                                name = name,
+                                file = filepath,
+                                lnum = lnum,
+                                col = col0 + #prefix_text + #opts.open + 1,
+                            })
+                        end
+                    end)
+                end
+            end
+
+            return tags
         end,
     })
 

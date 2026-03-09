@@ -1,5 +1,7 @@
 local M = {}
 
+-- /@@fts.core.app_new
+-- /@@fts.core.normalize_config
 --- Register all autocommands that drive buffer initialization, live refresh,
 --- and automatic tag persistence.
 ---
@@ -9,6 +11,7 @@ local M = {}
 --- @param fluxtags table  The main fluxtags module table
 --- @param schedule_refresh fun(bufnr: number)
 ---
+-- @@@fts.autocmds.setup
 function M.setup(fluxtags, schedule_refresh)
     local _config = require("fluxtags_config")
     local augroup = vim.api.nvim_create_augroup("Fluxtags", { clear = true })

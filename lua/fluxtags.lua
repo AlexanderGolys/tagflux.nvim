@@ -9,9 +9,10 @@
 
 local config_mod = require("fluxtags_config")
 local Path = require("fluxtags.path")
-local kind_registry = require("tagkinds.registry")
+local kind_registry = require("fluxtags.kind_registry")
 
 -- @@@fluxtags
+
 local M = {}
 
 --- @class Config
@@ -21,6 +22,10 @@ local M = {}
 --- @field filetypes_ignore? string[] Deprecated alias for `filetypes_exc`
 --- @field kinds? table<string, KindConfig> Per-kind overrides
 --- @field highlights? table<string, string|vim.api.keyset.highlight> Highlight overrides
+--- @field startup? StartupConfig Startup behavior options
+--- @field startup_setup_buffer? boolean Deprecated alias for `startup.setup_buffer`
+--- @field startup_update_tags? boolean Deprecated alias for `startup.update_tags`
+--- @field startup_load_tags? boolean Deprecated alias for `startup.load_tags`
 
 --- @class FluxtagsApp
 --- @field config Config
@@ -141,17 +146,11 @@ local function format_changes(added, removed, modified)
 end
 
 ---@return FluxtagsApp
+-- @@@fts.core.app_new
 function App.new()
     ---@type FluxtagsApp
     local self = setmetatable({
-        config = {
-            filetypes_inc = nil,
-            filetypes_exc = {},
-            filetypes_whitelist = nil,
-            filetypes_ignore = {},
-            kinds = {},
-            highlights = nil,
-        },
+        config = config_mod.get_opts(),
         ns = vim.api.nvim_create_namespace("fluxtags"),
         diag_ns = vim.api.nvim_create_namespace("fluxtags_diag"),
         tag_kinds = {},
@@ -173,23 +172,8 @@ function App.new()
     return self
 end
 
----@param cfg Config
----@return Config
-local function normalize_config(cfg)
-    if cfg.filetypes_inc == nil and cfg.filetypes_whitelist ~= nil then
-        cfg.filetypes_inc = cfg.filetypes_whitelist
-    end
-    if cfg.filetypes_exc == nil and cfg.filetypes_ignore ~= nil then
-        cfg.filetypes_exc = cfg.filetypes_ignore
-    end
-
-    cfg.filetypes_whitelist = cfg.filetypes_inc
-    cfg.filetypes_ignore = cfg.filetypes_exc or {}
-    cfg.filetypes_exc = cfg.filetypes_ignore
-    return cfg
-end
-
 ---@return fun(): string, TagKind
+-- @@@fts.core.ordered_kinds
 function App:ordered_kinds()
     local i = 0
     return function()
@@ -546,15 +530,30 @@ function App:schedule_refresh(bufnr)
     end, 80)
 end
 
+function App:run_startup_actions()
+    local startup = self.config.startup or {}
+    local bufnr = vim.api.nvim_get_current_buf()
+
+    if startup.load_tags then
+        self:load_all_tags()
+    end
+    if startup.setup_buffer then
+        self:setup_buffer(bufnr, true)
+    end
+    if startup.update_tags then
+        self:update_tags(true, bufnr)
+    end
+end
+
 ---@param opts? Config
 function App:setup(opts)
-    self.config = normalize_config(vim.tbl_deep_extend("force", self.config, opts or {}))
+    self.config = config_mod.setup(opts)
     config_mod.setup_default_highlights(self.config.highlights)
 
     self.kind_registry:register_all(M)
-
     require("fluxtags.autocmds").setup(M, function(bufnr) self:schedule_refresh(bufnr) end)
     require("fluxtags.commands").setup(M)
+    self:run_startup_actions()
 end
 
 local app = App.new()

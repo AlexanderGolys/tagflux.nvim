@@ -41,7 +41,7 @@ function M.register(fluxtags)
         name = "ref",
         pattern = " /@@([%w_.%-%+%*%/%\\:]+)",
         hl_group = "FluxTagRef",
-        conceal_open = " @",
+        conceal_open = "@",
         priority = 1100,
     })
     local kind_cfg = binder.cfg

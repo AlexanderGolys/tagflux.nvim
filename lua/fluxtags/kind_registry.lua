@@ -3,6 +3,7 @@
 ---
 --- Keeps construction of built-in kind modules in one place and provides a small
 --- class-backed structure for registering all available kinds during setup.
+--- /@@fts.core.app_new
 --- @brief ]]
 
 local M = {}
@@ -84,6 +85,7 @@ end
 
 --- Build default built-in kind registry in explicit order.
 ---@return TagKindRegistry
+-- @@@fts.registry.builtins
 function M.builtins()
     return KindRegistry.new({
         KindEntry.new("mark", "tagkinds.mark"),
