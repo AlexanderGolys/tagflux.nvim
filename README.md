@@ -70,6 +70,30 @@ require("fluxtags").setup({
 3. **Reference it** — type `/@@mymark` to create a reference
 4. **List all marks** — run `:FTagsList mark`
 
+### Workflow For Coding Agents
+
+If you use fluxtags while editing code with AI agents, this pattern works well:
+
+- Put `@@@name` marks on stable definitions worth jumping back to.
+- Put `/@@name` refs near important callers, helpers, and tests.
+- Use dotted names like `@@@commands.list` when a feature has a clear hierarchy.
+- Use `@##topic` for broader cross-file themes and `#|#||topic||` to refer to an existing topic without adding a new primary occurrence.
+- Use `///<target>` only when a help topic, URL, or path will genuinely help the next person navigate the change.
+- Prefer comment-prefixed block tags so the source stays valid in any language.
+- Skip trivial helpers and obvious one-hop code paths; tag the architectural seams, not everything.
+
+Example:
+
+```lua
+-- @@@commands.list
+local function list_tags()
+  -- /@@picker.render
+  return render_picker()
+end
+
+-- @##picker-flow
+```
+
 ---
 
 ## Tag Types
