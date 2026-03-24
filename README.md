@@ -245,7 +245,7 @@ require("fluxtags").setup({
 | Group          | Default         | Used for |
 |----------------|-----------------|----------|
 | `FluxTagMarks` | Pink/Red        | Marks    |
-| `FluxTagRef`   | Lavender        | References |
+| `FluxTagRef`   | Soft red        | References |
 | `FluxTagBib`   | Teal            | Links    |
 | `FluxTagOg`    | Yellow          | Hashtags |
 | `FluxTagCfg`   | Green           | Config directives |

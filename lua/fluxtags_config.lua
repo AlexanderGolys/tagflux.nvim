@@ -95,7 +95,7 @@ end
 --- Called on load, VimEnter, and ColorScheme to survive theme changes.
 local function link_default_highlights()
     vim.api.nvim_set_hl(0, "FluxTagMarks", { bold = true, fg = "#FF97Aa", nocombine = true })
-    vim.api.nvim_set_hl(0, "FluxTagRef", { italic = true, fg = "#DFCFFF", })
+    vim.api.nvim_set_hl(0, "FluxTagRef", { italic = true, fg = "#FF9FAF", bold = true })
     vim.api.nvim_set_hl(0, "FluxTagOg", { bold = true, fg = "#F9e2af" })
     vim.api.nvim_set_hl(0, "FluxTagRefog", { underline = true, bg = "#FFD946", fg = "#FFF9DC" })
     vim.api.nvim_set_hl(0, "FluxTagCfg", { fg = "#C2F397" })
