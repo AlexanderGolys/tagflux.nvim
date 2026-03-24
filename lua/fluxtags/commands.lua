@@ -21,6 +21,39 @@ local PREVIEW_KINDS = { "mark", "ref", "refog", "bib", "og", "hl", "cfg" }
 
 local KIND_SYMBOLS = { mark = "@", ref = "&", refog = "#", og = "#", cfg = "$", hl = "%", bib = "/" }
 
+local DEFAULT_KEYMAPS = {
+  jump = {
+    "<C-]>",
+    mode = "n",
+    desc = "Jump to fluxtag under cursor",
+  },
+}
+
+local active_keymaps = {}
+
+---@param name string
+---@param spec string|false|FluxtagsKeymapSpec|nil
+---@return table|nil
+local function resolve_keymap_spec(name, spec)
+  local default = DEFAULT_KEYMAPS[name]
+  if not default or spec == false or spec == nil then
+    return spec == nil and vim.deepcopy(default) or nil
+  end
+  if type(spec) == "string" then
+    local merged = vim.deepcopy(default)
+    merged[1] = spec
+    return merged
+  end
+  if type(spec) ~= "table" then
+    vim.notify(("fluxtags: ignoring invalid keymap config for %s"):format(name), vim.log.levels.WARN)
+    return nil
+  end
+  local merged = vim.tbl_deep_extend("force", vim.deepcopy(default), spec)
+  merged[1] = merged[1] or merged.lhs
+  merged.lhs = nil
+  return type(merged[1]) == "string" and merged[1] ~= "" and merged or nil
+end
+
 ---@return table|nil
 local function snacks_picker()
   if _G.Snacks and _G.Snacks.picker then
@@ -474,7 +507,20 @@ end
 ---@param self FluxtagsCommands
 ---@return nil
 function Commands:setup_keymap()
-  vim.keymap.set("n", "<C-]>", self.fluxtags.jump_to_tag, { desc = "Jump to fluxtag under cursor" })
+  local active = active_keymaps.jump
+  if active then
+    pcall(vim.keymap.del, active.mode, active.lhs)
+    active_keymaps.jump = nil
+  end
+  local keymaps = self.config_mod.get_opts().keymaps
+  local jump = resolve_keymap_spec("jump", keymaps and keymaps.jump)
+  if not jump then
+    return
+  end
+  local lhs, mode = jump[1], jump.mode or "n"
+  jump[1], jump.mode = nil, nil
+  vim.keymap.set(mode, lhs, self.fluxtags.jump_to_tag, jump)
+  active_keymaps.jump = { mode = mode, lhs = lhs }
 end
 
 ---@param self FluxtagsCommands

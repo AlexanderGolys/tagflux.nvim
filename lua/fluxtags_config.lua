@@ -28,11 +28,28 @@ local M = {}
 --- @field update_tags? boolean Run an initial silent `update_tags()` during `setup()`
 --- @field load_tags? boolean Load all tagfiles into memory during `setup()`
 
+--- @alias FluxtagsKeymapMode string|string[]
+
+--- @class FluxtagsKeymapSpec
+--- @field [1]? string Left-hand side passed to `vim.keymap.set()`
+--- @field lhs? string Named alias for `[1]`
+--- @field mode? FluxtagsKeymapMode Mapping mode(s); defaults to `"n"`
+--- @field desc? string Mapping description
+--- @field remap? boolean
+--- @field silent? boolean
+--- @field expr? boolean
+--- @field nowait? boolean
+--- @field unique? boolean
+
+--- @class FluxtagsKeymapsConfig
+--- @field jump? string|false|FluxtagsKeymapSpec Mapping for `jump_to_tag()`
+
 --- @class PluginConfig
 --- @field filetypes_inc? string[] Filetypes included for processing (empty/nil = all)
 --- @field filetypes_exc? string[] Filetypes excluded from processing
 --- @field filetypes_whitelist? string[] Deprecated alias for `filetypes_inc`
 --- @field filetypes_ignore? string[] Deprecated alias for `filetypes_exc`
+--- @field keymaps? FluxtagsKeymapsConfig Keymap overrides; set an entry to `false` to disable it
 --- @field kinds? table<string, KindConfig> Per-kind overrides
 --- @field highlights? table<string, string|vim.api.keyset.highlight> Highlight overrides
 --- @field startup? StartupConfig Startup behavior options
@@ -52,6 +69,9 @@ M.plugin_defaults = {
     filetypes_exc = {},
     filetypes_whitelist = nil,
     filetypes_ignore = {},
+    keymaps = {
+        jump = "<C-]>",
+    },
     kinds = {},
     highlights = nil,
     startup = {

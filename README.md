@@ -215,6 +215,11 @@ require("fluxtags").setup({
   
   -- Skip these filetypes
   filetypes_exc = {},
+
+  -- Override or disable plugin keymaps
+  keymaps = {
+    jump = "<C-]>",
+  },
   
   -- Override highlight colors
   highlights = {
@@ -301,7 +306,19 @@ Press **Ctrl-]** to jump to a tag under your cursor.
 - `filetypes_whitelist` — include only these filetypes (empty/nil = all)
 - `filetypes_ignore` — skip listed filetypes
 - `filetypes_inc` / `filetypes_exc` — preferred aliases for include/exclude
+- `keymaps.jump` — override the jump mapping, or set to `false` to disable it
 - `highlights` — override any `FluxTag*` highlight group
+
+Example:
+
+```lua
+require("fluxtags").setup({
+  keymaps = {
+    jump = "g]",
+    -- jump = false,
+  },
+})
+```
 - `kinds` — per-kind overrides (`mark`, `ref`, `refog`, `bib`, `og`, `hl`, `cfg`)
 - `startup.setup_buffer` — run `setup_buffer()` for current buffer during `setup()` (default `true`)
 - `startup.update_tags` — run an initial silent `update_tags()` during `setup()` (default `false`)
