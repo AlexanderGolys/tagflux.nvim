@@ -3,6 +3,7 @@
 --- @brief ]]
 
 -- @@@fluxtags.mark
+-- @##tagkind
 
 local prefixed = require("fluxtags.prefixed_kind")
 local kind_common = require("fluxtags.common")
@@ -14,6 +15,16 @@ local Extmark = require("fluxtags.extmark")
 local M = {}
 
 local MARK_NAME_PATTERN = kind_common.NAME_CHARS
+
+---@param name string
+---@return string
+local function jump_name(name)
+    local base = jump_util.base_name(name)
+    if base ~= name then
+        return base
+    end
+    return name
+end
 
 ---@param line string
 ---@param match_start number
@@ -47,9 +58,9 @@ function M.register(fluxtags)
     local runtime = support.new_runtime(fluxtags)
     local binder = prefixed.binder(fluxtags, "mark", {
         name = "mark",
-        pattern = "@@@(" .. MARK_NAME_PATTERN .. ")",
+        pattern = " @@@(" .. MARK_NAME_PATTERN .. ")",
         hl_group = "FluxTagMarks",
-        open = "@@@",
+        open = " @@@",
         conceal_open = "@",
     })
     local opts = binder.opts
@@ -68,7 +79,7 @@ function M.register(fluxtags)
             }
         end,
         on_jump = function(name, ctx)
-            return runtime:jump_to_first(ctx.kind_name, name, ctx, "Tag not found: ")
+            return runtime:jump_to_first(ctx.kind_name, jump_name(name), ctx, "Tag not found: ")
         end,
         find_at_cursor = function(self, line, col)
             for match_start, name in line:gmatch("()" .. opts.pattern) do

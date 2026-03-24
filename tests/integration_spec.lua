@@ -20,9 +20,9 @@ function M.run()
     local mark_kind = fluxtags.tag_kinds.mark
     
     local lines = {
-        "@@@function_start",
+        "-- @@@function_start",
         "function code here",
-        "@@@function_end",
+        "-- @@@function_end",
     }
     
     -- collect_tags should work for mark kind
@@ -81,9 +81,9 @@ function M.run()
     -- Test 5: Tag validation
     print("Test 5: Tag name validation")
     local invalid_lines = {
-        "@@@valid",
-        "@@@",
-        "@@@another.valid",
+        "-- @@@valid",
+        "-- @@@",
+        "-- @@@another.valid",
     }
     
     local mixed_tags = mark_kind:collect_tags("/tmp/mixed.lua", invalid_lines)
@@ -100,7 +100,7 @@ function M.run()
     local sparse = {
         "",
         "",
-        "@@@sparse_tag",
+        "-- @@@sparse_tag",
         "",
     }
     
@@ -111,20 +111,49 @@ function M.run()
     -- Test 8: Special characters in names
     print("Test 8: Special character support")
     local special_lines = {
-        "@@@config.defaults",
-        "@@@feature-flag",
-        "@@@parser_v2",
+        "-- @@@config.defaults",
+        "-- @@@feature-flag",
+        "-- @@@parser_v2",
     }
     
     local special_tags = mark_kind:collect_tags("/tmp/special.lua", special_lines)
     helpers.assert_len(special_tags, 3, "Should handle special chars")
+
+    -- Test 8b: Dotted mark jumps resolve to the parent mark
+    print("Test 8b: Dotted mark jump resolution")
+    local jump_file = tmpdir .. "/jump.lua"
+    vim.fn.writefile({
+        "-- @@@config",
+        "-- @@@config.defaults",
+    }, jump_file)
+    local jump_ctx = {
+        utils = {
+            load_tagfile = function()
+                return {
+                    config = {
+                        { file = jump_file, lnum = 1, col = 4 },
+                    },
+                    ["config.defaults"] = {
+                        { file = jump_file, lnum = 2, col = 4 },
+                    },
+                }
+            end,
+            open_file = function(path)
+                vim.cmd.edit(path)
+            end,
+        },
+        kind_name = "mark",
+    }
+    local jumped = mark_kind.on_jump("config.defaults", jump_ctx)
+    helpers.assert_true(jumped, "Dotted mark jump should be handled")
+    helpers.assert_eq(1, vim.fn.line("."), "Dotted mark should jump to parent mark")
     
     -- Test 9: Duplicate names in file
     print("Test 9: Duplicate names")
     local dups = {
-        "@@@sameName",
+        "-- @@@sameName",
         "other content",
-        "@@@sameName",
+        "-- @@@sameName",
     }
     
     local dup_tags = mark_kind:collect_tags("/tmp/dups.lua", dups)
@@ -137,7 +166,7 @@ function M.run()
     local large = {}
     for i = 1, 100 do
         if i % 10 == 0 then
-            table.insert(large, "@@@mark_" .. i)
+            table.insert(large, "-- @@@mark_" .. i)
         else
             table.insert(large, "line " .. i)
         end

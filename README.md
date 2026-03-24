@@ -1,4 +1,4 @@
-# fluxtags.nvim
+<F13># fluxtags.nvim
 
 A lightweight tagging system for Neovim that lets you create marks, references, links, and hashtags across your files with seamless navigation.
 
@@ -41,7 +41,6 @@ require("fluxtags").setup()
 ```vim
 Plug 'flux/nvim-plugins/fluxtags.nvim'
 ```
-
 Then in your `init.lua`:
 
 ```config
@@ -112,7 +111,7 @@ end
 local config = { ... }
 ```
 
-**Jump behavior:** Ctrl-] on `@@@init` jumps to that line.
+**Jump behavior:** Ctrl-] on `@@@init` jumps to that line. Dotted marks like `@@@config.defaults` jump to the parent mark `@@@config`.
 
 ---
 
