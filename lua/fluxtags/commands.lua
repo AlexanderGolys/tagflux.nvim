@@ -128,6 +128,9 @@ local function collect_entries(tag_kinds, load_tagfile, kind_filter)
             file = e.file,
             lnum = e.lnum,
             col = e.col,
+            pos = { e.lnum, math.max((e.col or 1) - 1, 0) },
+            preview = "file",
+            preview_title = path_utils:display_relative(e.file),
             text = ("[%s] %s"):format(kind_symbol(kind_name), name),
           })
         end
