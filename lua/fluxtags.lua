@@ -12,6 +12,17 @@ local Path = require("fluxtags.path")
 local kind_registry = require("fluxtags.kind_registry")
 
 -- @@@fluxtags
+-- /@@fluxtags.config
+
+-- @##tagkind
+    -- /@@fluxtags.og
+    -- /@@fluxtags.ref
+    -- /@@fluxtags.bib
+    -- /@@fluxtags.hl
+    -- /@@fluxtags.cfg
+    -- /@@fluxtags.mark
+
+-- /@@fluxtags.lazy
 
 local M = {}
 
@@ -20,6 +31,7 @@ local M = {}
 --- @field filetypes_exc? string[] Filetypes excluded from processing
 --- @field filetypes_whitelist? string[] Deprecated alias for `filetypes_inc`
 --- @field filetypes_ignore? string[] Deprecated alias for `filetypes_exc`
+--- @field keymaps? FluxtagsKeymapsConfig Keymap overrides; set an entry to `false` to disable it
 --- @field kinds? table<string, KindConfig> Per-kind overrides
 --- @field highlights? table<string, string|vim.api.keyset.highlight> Highlight overrides
 --- @field startup? StartupConfig Startup behavior options
@@ -519,12 +531,18 @@ function App:schedule_refresh(bufnr)
     if not self:should_process_buf(bufnr) or vim.b[bufnr].fluxtags_refresh_scheduled then return end
     vim.b[bufnr].fluxtags_refresh_scheduled = true
 
+    local function clear_refresh_flag()
+        if vim.api.nvim_buf_is_valid(bufnr) then
+            vim.b[bufnr].fluxtags_refresh_scheduled = false
+        end
+    end
+
     vim.defer_fn(function()
         if not self:should_process_buf(bufnr) then
-            vim.b[bufnr].fluxtags_refresh_scheduled = false
+            clear_refresh_flag()
             return
         end
-        vim.b[bufnr].fluxtags_refresh_scheduled = false
+        clear_refresh_flag()
         self:setup_buffer(bufnr, true)
         if not vim.bo[bufnr].modified then self:update_tags(true, bufnr) end
     end, 80)

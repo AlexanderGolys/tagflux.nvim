@@ -3,6 +3,7 @@
 --- @brief ]]
 
 -- @@@fluxtags.ref
+-- @##tagkind
 
 
 local prefixed = require("fluxtags.prefixed_kind")
@@ -68,12 +69,31 @@ function M.register(fluxtags)
             return runtime:jump_to_first(marks_kind_name, name, ctx, "Tag not found: ")
         end,
         apply_extmarks = function(self, bufnr, lnum, line, ns, is_disabled)
-            prefix_util.apply_prefixed_extmarks(bufnr, ns, lnum, line, opts.pattern, opts.comment_prefix_patterns, {
-                open = open,
-                conceal_open = opts.conceal_open,
-                hl_group = self.hl_group,
-                priority = self.priority,
-            }, is_disabled)
+            for match_start, name in line:gmatch("()" .. opts.pattern) do
+                local prefix_start, prefix_text = prefix_util.find_prefix(line, tonumber(match_start), opts.comment_prefix_patterns)
+                local col0 = prefix_start - 1
+                local prefix_len = #prefix_text
+
+                if not (is_disabled and is_disabled(lnum, col0)) then
+                    Extmark.place(bufnr, ns, lnum, col0, {
+                        end_col = col0 + prefix_len + 1,
+                        conceal = "/",
+                        hl_group = self.hl_group,
+                        priority = self.priority or 1100,
+                    })
+                    Extmark.place(bufnr, ns, lnum, col0 + prefix_len + 1, {
+                        end_col = col0 + prefix_len + #open,
+                        conceal = "@",
+                        hl_group = self.hl_group,
+                        priority = self.priority or 1100,
+                    })
+                    Extmark.place(bufnr, ns, lnum, col0 + prefix_len + #open, {
+                        end_col = col0 + prefix_len + #open + #name,
+                        hl_group = self.hl_group,
+                        priority = self.priority or 1100,
+                    })
+                end
+            end
 
             for_each_inline_ref(line, function(col0, ref)
                 if not (is_disabled and is_disabled(lnum, col0)) then

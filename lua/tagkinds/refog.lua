@@ -3,6 +3,7 @@
 --- @brief ]]
 
 -- @@@fluxtags.refog
+-- @##tagkind
 
 
 local prefixed = require("fluxtags.prefixed_kind")
@@ -25,12 +26,10 @@ function M.register(fluxtags)
     local og_cfg = (fluxtags.config.kinds and fluxtags.config.kinds.og) or {}
     local binder = prefixed.binder(fluxtags, "refog", {
         name = "refog",
-        pattern = " #|#||([%w_.%-%+%*%/%\\:]+)||",
+        pattern = " #|#||([%w_.%-%+%*%/%\\:]+)",
         hl_group = "FluxTagRef",
         open = " #|#||",
-        close = "||",
         conceal_open = "#",
-        conceal_close = "",
     })
     local opts = binder.opts
     local og_kind_name = og_cfg.name or "og"

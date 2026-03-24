@@ -3,6 +3,7 @@
 --- @brief ]]
 
 -- @@@fluxtags.bib
+-- @##tagkind
 
 local prefixed = require("fluxtags.prefixed_kind")
 

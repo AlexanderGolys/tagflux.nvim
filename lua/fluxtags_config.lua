@@ -15,8 +15,6 @@ local M = {}
 --- @class KindConfig
 --- @field name string Unique kind identifier, e.g. "mark"
 --- @field tagfile? string Absolute path to the persistent tagfile; nil disables persistence
---- @field filetypes_inc? string[] Limit tag scanning to these filetypes (empty = all)
---- @field filetypes_exc? string[] Skip these filetypes even when filetypes_inc is empty
 --- @field hl_group? string Highlight group name; defaults to "FluxTag" .. capitalized name
 
 --- @class GlobalConfig
@@ -91,6 +89,7 @@ local function default_tagfile_path(kind)
     return vim.fn.stdpath("data") .. "/fluxtags." .. kind .. ".tags"
 end
 
+-- /@@fluxtags
 --- Link each FluxTag highlight group to a sensible built-in group.
 --- Called on load, VimEnter, and ColorScheme to survive theme changes.
 local function link_default_highlights()

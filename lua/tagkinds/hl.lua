@@ -12,6 +12,7 @@
 --- @brief ]]
 
 -- @@@fluxtags.hl
+-- @##tagkind
 
 local tag_kind = require("tag_kind")
 local prefix_util = require("fluxtags.prefix")

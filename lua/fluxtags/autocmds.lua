@@ -1,3 +1,6 @@
+
+-- @@@fluxtags.autocmds
+
 local M = {}
 
 -- /@@fts.core.app_new
@@ -10,8 +13,6 @@ local M = {}
 ---
 --- @param fluxtags table  The main fluxtags module table
 --- @param schedule_refresh fun(bufnr: number)
----
--- @@@fts.autocmds.setup
 function M.setup(fluxtags, schedule_refresh)
     local _config = require("fluxtags_config")
     local augroup = vim.api.nvim_create_augroup("Fluxtags", { clear = true })
@@ -45,8 +46,8 @@ function M.setup(fluxtags, schedule_refresh)
     })
 
     -- Re-apply extmarks while editing so highlights stay in sync with edits.
-    vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
-        group    = augroup,
+    vim.api.nvim_create_autocmd({ "ModeChanged" }, {
+    group    = augroup,
         callback = function(args) schedule_refresh(args.buf) end,
     })
 

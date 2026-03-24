@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fluxtags Agent Docs"
+  short_description: "Document codebases with fluxtags prompts"
+  default_prompt: "Use $fluxtags-agent-docs to document this codebase with fluxtags and update AGENTS.md navigation guidance."

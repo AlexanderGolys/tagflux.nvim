@@ -86,7 +86,6 @@ Example:
 ```lua
 -- @@@commands.list
 local function list_tags()
-  -- /@@picker.render
   return render_picker()
 end
 
@@ -220,7 +219,7 @@ require("fluxtags").setup({
   keymaps = {
     jump = "<C-]>",
   },
-  
+   
   -- Override highlight colors
   highlights = {
     -- FluxTagMarks = "Identifier",
@@ -308,6 +307,10 @@ Press **Ctrl-]** to jump to a tag under your cursor.
 - `filetypes_inc` / `filetypes_exc` — preferred aliases for include/exclude
 - `keymaps.jump` — override the jump mapping, or set to `false` to disable it
 - `highlights` — override any `FluxTag*` highlight group
+- `kinds` — per-kind overrides (`mark`, `ref`, `refog`, `bib`, `og`, `hl`, `cfg`)
+- `startup.setup_buffer` — run `setup_buffer()` for current buffer during `setup()` (default `true`)
+- `startup.update_tags` — run an initial silent `update_tags()` during `setup()` (default `false`)
+- `startup.load_tags` — load all tagfiles during `setup()` (default `false`)
 
 Example:
 
@@ -319,10 +322,6 @@ require("fluxtags").setup({
   },
 })
 ```
-- `kinds` — per-kind overrides (`mark`, `ref`, `refog`, `bib`, `og`, `hl`, `cfg`)
-- `startup.setup_buffer` — run `setup_buffer()` for current buffer during `setup()` (default `true`)
-- `startup.update_tags` — run an initial silent `update_tags()` during `setup()` (default `false`)
-- `startup.load_tags` — load all tagfiles during `setup()` (default `false`)
 
 ### Cfg directives
 

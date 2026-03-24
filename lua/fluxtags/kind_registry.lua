@@ -85,7 +85,7 @@ end
 
 --- Build default built-in kind registry in explicit order.
 ---@return TagKindRegistry
--- @@@fts.registry.builtins
+-- @@@fluxtags.registry.builtins
 function M.builtins()
     return KindRegistry.new({
         KindEntry.new("mark", "tagkinds.mark"),
