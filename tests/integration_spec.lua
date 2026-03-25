@@ -46,7 +46,23 @@ function M.run()
     helpers.assert_eq("high-priority", og_tags[1].name)
     helpers.assert_eq(1, og_tags[1].lnum)
     helpers.assert_eq("regression", og_tags[2].name)
-    
+
+    -- Test 2b: HL extmarks stay within bounds at end of line
+    print("Test 2b: HL extmark bounds")
+    local hl_kind = fluxtags.tag_kinds.hl
+    local hl_lines = {
+        "-- &&&Error&&&FIXME: broken&&&",
+    }
+    local hl_bufnr = helpers.create_test_buffer(hl_lines)
+    local hl_ns = vim.api.nvim_create_namespace("test_hl")
+    local ok_hl, err_hl = pcall(function()
+        hl_kind:apply_extmarks(hl_bufnr, 0, hl_lines[1], hl_ns)
+    end)
+    helpers.assert_true(ok_hl, "HL extmarks should not overflow line bounds: " .. tostring(err_hl))
+    local hl_extmarks = vim.api.nvim_buf_get_extmarks(hl_bufnr, hl_ns, 0, -1, {})
+    helpers.assert_len(hl_extmarks, 5, "HL tags should create five extmarks")
+    helpers.cleanup_buffer(hl_bufnr)
+
     -- Test 3: Extmarks work for collected tags
     print("Test 3: Extmarks application")
     local bufnr = helpers.create_test_buffer(lines)

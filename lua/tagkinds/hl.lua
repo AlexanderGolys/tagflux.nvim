@@ -30,8 +30,8 @@ function M.register(fluxtags)
         "hl",
         {
             name = "hl",
-            pattern = " &&&([%w_@-]+)&&&(.-)&&&",
-            open = " &&&",
+            pattern = "&&&([%w_@-]+)&&&(.-)&&&",
+            open = "&&&",
             mid = "&&&",
             close = "&&&",
             conceal_open = "",
