@@ -47,6 +47,7 @@ function M.run()
     helpers.assert_eq(1, og_tags[1].lnum)
     helpers.assert_eq("regression", og_tags[2].name)
 
+    -- /@@fluxtags.hl
     -- Test 2b: HL extmarks stay within bounds at end of line
     print("Test 2b: HL extmark bounds")
     local hl_kind = fluxtags.tag_kinds.hl
@@ -62,6 +63,32 @@ function M.run()
     local hl_extmarks = vim.api.nvim_buf_get_extmarks(hl_bufnr, hl_ns, 0, -1, {})
     helpers.assert_len(hl_extmarks, 5, "HL tags should create five extmarks")
     helpers.cleanup_buffer(hl_bufnr)
+
+    -- Test 2c: HL tags support multiline content
+    print("Test 2c: HL multiline content")
+    local hl_multiline_lines = {
+        "-- &&&Error&&&FIXME: broken",
+        "-- still broken&&&",
+    }
+    local hl_multiline_bufnr = helpers.create_test_buffer(hl_multiline_lines)
+    local hl_multiline_ns = vim.api.nvim_create_namespace("test_hl_multiline")
+    local ok_hl_multiline, err_hl_multiline = pcall(function()
+        hl_kind:apply_extmarks(hl_multiline_bufnr, 0, hl_multiline_lines[1], hl_multiline_ns)
+    end)
+    helpers.assert_true(ok_hl_multiline, "HL multiline extmarks should apply: " .. tostring(err_hl_multiline))
+    local hl_multiline_extmarks = vim.api.nvim_buf_get_extmarks(hl_multiline_bufnr, hl_multiline_ns, 0, -1, { details = true })
+    helpers.assert_len(hl_multiline_extmarks, 7, "Multiline HL tags should create seven extmarks")
+
+    local saw_second_line_highlight = false
+    for _, extmark in ipairs(hl_multiline_extmarks) do
+        local details = extmark[4]
+        if extmark[2] == 1 and details and details.hl_group == "Error" then
+            saw_second_line_highlight = true
+            break
+        end
+    end
+    helpers.assert_true(saw_second_line_highlight, "Multiline HL tags should highlight continuation lines")
+    helpers.cleanup_buffer(hl_multiline_bufnr)
 
     -- Test 3: Extmarks work for collected tags
     print("Test 3: Extmarks application")

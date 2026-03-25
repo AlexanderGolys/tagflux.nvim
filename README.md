@@ -173,11 +173,14 @@ References a hashtag without adding a new occurrence to the list.
 
 ### Inline Highlight `&&&<Group>&&&<text>&&&`
 
-Highlights text with any highlight group. Delimiters are hidden.
+Highlights text with any highlight group. Delimiters are hidden, and the
+highlighted content may span multiple lines.
 
 ```config
 -- &&&Error&&&FIXME: broken&&&
 -- &&&WarningMsg&&&TODO: check this&&&
+-- &&&Error&&&First highlighted line
+-- second highlighted line&&&
 ```
 
 **Jump behavior:** No jump (just visual highlighting).

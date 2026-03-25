@@ -14,7 +14,7 @@ local KIND_HELP = {
     refog = { syntax = "#|#||<name>||", info = "Reference-only OG jump tag; does not create saved hashtag entries." },
     bib = { syntax = "-- ///<target>", info = "External links (URL/file/help topic); opens target on Ctrl-]." },
     og = { syntax = "@##<name>", info = "Topic hashtags across files; Ctrl-] opens a picker of occurrences." },
-    hl = { syntax = "&&&<HlGroup>&&&<text>&&&", info = "Inline styled text using any Neovim highlight group." },
+    hl = { syntax = "&&&<HlGroup>&&&<text>&&&", info = "Inline styled text using any Neovim highlight group, including multiline content." },
     cfg = { syntax = "$$$<key>(<value>)", info = "Buffer-local config directives applied on enter." },
 }
 
