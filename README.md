@@ -371,6 +371,7 @@ Tags use special characters that simplify on screen:
 | Config   | `$$$ft(lua)`      | `$ft(lua)` |
 
 You can disable this simplification by setting `conceallevel=0` in a file or via `:set conceallevel=0`.
+For comment-prefixed references, the comment prefix and `/@@` marker are concealed together so `-- /@@name` renders as `/@name` while the tag name remains aligned.
 
 ---
 

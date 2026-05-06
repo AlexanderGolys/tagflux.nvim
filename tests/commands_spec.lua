@@ -48,8 +48,14 @@ function M.run()
     table.sort(extmarks, function(a, b)
       return a[3] < b[3]
     end)
+    helpers.assert_eq(0, extmarks[1][3], "ref prefix conceal should start at the comment prefix")
+    helpers.assert_eq(4, extmarks[1][4].end_col, "ref prefix conceal should include the slash")
     helpers.assert_eq("/", extmarks[1][4].conceal, "ref prefix should keep slash visible")
+    helpers.assert_eq(4, extmarks[2][3], "ref marker conceal should start at the first @")
+    helpers.assert_eq(6, extmarks[2][4].end_col, "ref marker conceal should cover both @ characters")
     helpers.assert_eq("@", extmarks[2][4].conceal, "ref marker should collapse @@ to @")
+    helpers.assert_eq(6, extmarks[3][3], "ref name highlight should start after /@@")
+    helpers.assert_eq(12, extmarks[3][4].end_col, "ref name highlight should cover the full target name")
     helpers.cleanup_buffer(tree_buf)
 
     local mark_file = tmpdir .. "/notes.md"

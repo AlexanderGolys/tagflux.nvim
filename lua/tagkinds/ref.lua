@@ -42,13 +42,14 @@ function M.register(fluxtags)
         name = "ref",
         pattern = " /@@([%w_.%-%+%*%/%\\:]+)",
         hl_group = "FluxTagRef",
+        open = " /@@",
         conceal_open = "@",
         priority = 1100,
     })
     local kind_cfg = binder.cfg
     local opts = binder.opts
 
-    local open = kind_cfg.open or kind_common.derive_open(opts.pattern, " /@@")
+    local open = kind_cfg.open or opts.open or kind_common.derive_open(opts.pattern, " /@@")
     local marks_kind_name = marks_cfg.name or "mark"
     local ref_diag_ns = fluxtags.utils.make_diag_ns("ref")
 
@@ -75,20 +76,22 @@ function M.register(fluxtags)
                 local prefix_len = #prefix_text
 
                 if not (is_disabled and is_disabled(lnum, col0)) then
+                    local slash_end = col0 + prefix_len + 2
+                    local marker_end = col0 + prefix_len + #open
                     Extmark.place(bufnr, ns, lnum, col0, {
-                        end_col = col0 + prefix_len + 1,
+                        end_col = slash_end,
                         conceal = "/",
                         hl_group = self.hl_group,
                         priority = self.priority or 1100,
                     })
-                    Extmark.place(bufnr, ns, lnum, col0 + prefix_len + 1, {
-                        end_col = col0 + prefix_len + #open,
+                    Extmark.place(bufnr, ns, lnum, slash_end, {
+                        end_col = marker_end,
                         conceal = "@",
                         hl_group = self.hl_group,
                         priority = self.priority or 1100,
                     })
-                    Extmark.place(bufnr, ns, lnum, col0 + prefix_len + #open, {
-                        end_col = col0 + prefix_len + #open + #name,
+                    Extmark.place(bufnr, ns, lnum, marker_end, {
+                        end_col = marker_end + #name,
                         hl_group = self.hl_group,
                         priority = self.priority or 1100,
                     })
