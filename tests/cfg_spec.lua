@@ -66,16 +66,29 @@ function M.run()
         {2, 19, 3, 0},
     }, hl_intervals, "multiple hl intervals")
     
+
+    -- Test 3b: new colon-style cfg directives
+    lines = {
+        "$$$ftags-hl:off",
+        "line",
+        "$$$ftags-hl:on",
+        "$$$ftags-register:off",
+    }
+    hl_intervals = cfg_kind:get_disabled_intervals(lines, "ftags-hl")
+    assert_deep_eq({{0, 15, 2, 0}}, hl_intervals, "ftags-hl colon interval")
+    reg_intervals = cfg_kind:get_disabled_intervals(lines, "ftags-register")
+    assert_deep_eq({{3, 21, math.huge, math.huge}}, reg_intervals, "ftags-register colon interval")
+
     -- Test 4: Buffer wide disabled flag
     local bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
-        "$$$fluxtags(off)",
+        "$$$ftags:off",
         "###test_mark",
     })
     
-    -- Simulate on_enter to trigger the fluxtags(off) handler
+    -- Simulate on_enter to trigger the ftags:off handler
     cfg_kind.on_enter(bufnr, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
-    assert_eq(true, vim.b[bufnr].fluxtags_disabled, "fluxtags(off) should set buffer variable")
+    assert_eq(true, vim.b[bufnr].fluxtags_disabled, "ftags:off should set buffer variable")
     
 
     -- Test 5: directive list metadata includes syntax and examples for previews.
@@ -86,6 +99,7 @@ function M.run()
     end
     assert_eq("$$$ft(<value>)", by_key.ft.syntax, "cfg list should expose directive syntax")
     assert_eq(true, by_key.ft.example:find("$$$ft%(lua%)") ~= nil, "cfg list should expose an example")
+    assert_eq("$$$ftags:<on|off>", by_key.ftags.syntax, "cfg list should expose colon syntax")
     print("All tests passed!")
 end
 

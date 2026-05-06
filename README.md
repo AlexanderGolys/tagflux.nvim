@@ -194,8 +194,8 @@ Sets per-file configuration.
 ```config
 $$$ft(lua)               -- force Lua filetype
 $$$conceallevel(2)       -- adjust conceal level
-$$$fluxtags(off)         -- disable tags in this file
-$$$modeline(set wrap)    -- run Vim command
+$$$ftags:off             -- disable tags in this file
+$$$exec(set wrap)        -- run Vim command
 ```
 
 ---
@@ -344,10 +344,10 @@ The built-in directives are:
 
 - `ft(value)` — set buffer filetype
 - `conceallevel(value)` — set `conceallevel` on windows containing the buffer
-- `fluxtags(off)` — disable fluxtags in the buffer
-- `fluxtags_hl(off/on)` — disable/enable fluxtags highlights in regions
-- `fluxtags_reg(off/on)` — disable/enable tag registration in regions
-- `modeline(cmd)` — run any Ex command
+- `ftags:off` / `ftags:on` — disable/enable fluxtags in the buffer
+- `ftags-hl:off` / `ftags-hl:on` — disable/enable fluxtags highlights in regions
+- `ftags-register:off` / `ftags-register:on` — disable/enable tag registration in regions
+- `exec(cmd)` — run any Ex command
 
 Use `:FTagsCfgList` to print the current list (including descriptions).
 

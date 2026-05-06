@@ -31,6 +31,10 @@ local M = {}
 local descriptions = {
   ft = "Set the buffer filetype (e.g., ft(lua))",
   conceallevel = "Set conceallevel for this buffer (0-3)",
+  ["ftags"] = "Enable or disable all fluxtags processing",
+  ["ftags-hl"] = "Enable or disable fluxtags highlighting in a region",
+  ["ftags-register"] = "Enable or disable tag registration in a region",
+  exec = "Execute an arbitrary Ex command",
   fluxtags = "Disable all fluxtags processing (off)",
   fluxtags_hl = "Disable highlighting in regions (e.g., fluxtags_hl(off/on))",
   fluxtags_reg = "Disable tag registration in regions (e.g., fluxtags_reg(off/on))",
@@ -40,11 +44,36 @@ local descriptions = {
 local examples = {
   ft = "```config\n$$$ft(lua)\n```",
   conceallevel = "```config\n$$$conceallevel(2)\n```",
+  ["ftags"] = "```config\n$$$ftags:off\n$$$ftags:on\n```",
+  ["ftags-hl"] = "```config\n$$$ftags-hl:off\n...\n$$$ftags-hl:on\n```",
+  ["ftags-register"] = "```config\n$$$ftags-register:off\n...\n$$$ftags-register:on\n```",
+  exec = "```config\n$$$exec(set wrap)\n```",
   fluxtags = "```config\n$$$fluxtags(off)\n```",
   fluxtags_hl = "```config\n$$$fluxtags_hl(off)\n...\n$$$fluxtags_hl(on)\n```",
   fluxtags_reg = "```config\n$$$fluxtags_reg(off)\n...\n$$$fluxtags_reg(on)\n```",
   modeline = "```config\n$$$modeline(set wrap)\n```",
 }
+
+local syntax = {
+  ["ftags"] = "$$$ftags:<on|off>",
+  ["ftags-hl"] = "$$$ftags-hl:<on|off>",
+  ["ftags-register"] = "$$$ftags-register:<on|off>",
+  exec = "$$$exec(<cmd>)",
+}
+
+local function set_fluxtags_enabled(value, bufnr)
+  if value == "off" then
+    vim.b[bufnr].fluxtags_disabled = true
+  elseif value == "on" then
+    vim.b[bufnr].fluxtags_disabled = false
+  end
+end
+
+local function exec_cmd(value, bufnr)
+  vim.api.nvim_buf_call(bufnr, function()
+    pcall(vim.cmd, value)
+  end)
+end
 
 local handlers = {
   ft = function(value, bufnr)
@@ -59,18 +88,24 @@ local handlers = {
     end
   end,
   fluxtags = function(value, bufnr)
-    if value == "off" then
-      vim.b[bufnr].fluxtags_disabled = true
-    end
+    set_fluxtags_enabled(value, bufnr)
+  end,
+  ftags = function(value, bufnr)
+    set_fluxtags_enabled(value, bufnr)
   end,
   fluxtags_hl = function()
   end,
+  ["ftags-hl"] = function()
+  end,
   fluxtags_reg = function()
   end,
+  ["ftags-register"] = function()
+  end,
   modeline = function(value, bufnr)
-    vim.api.nvim_buf_call(bufnr, function()
-      pcall(vim.cmd, value)
-    end)
+    exec_cmd(value, bufnr)
+  end,
+  exec = function(value, bufnr)
+    exec_cmd(value, bufnr)
   end,
 }
 
@@ -91,7 +126,7 @@ local function registry_info()
     table.insert(directives, {
       key = key,
       description = descriptions[key] or "No description available",
-      syntax = ("$$$%s(<value>)"):format(key),
+      syntax = syntax[key] or ("$$$%s(<value>)"):format(key),
       example = examples[key] or ("```config\n$$$%s(value)\n```"):format(key),
     })
   end
@@ -151,6 +186,12 @@ local function parse_cfg_line(line, search_pattern, parse_args)
       if args then
         value = args:sub(2, -2)
         tag_end = e + #args
+      else
+        local colon_value = line:sub(e + 1):match("^:([%w_-]+)")
+        if colon_value then
+          value = colon_value
+          tag_end = e + #colon_value + 1
+        end
       end
     end
     table.insert(directives, {
@@ -235,7 +276,7 @@ function M.register(fluxtags)
     prefix_util.default_comment_prefix_patterns
   )
 
-  local base_pattern = " %$%$%$([%w_]+)"
+  local base_pattern = "%$%$%$([%w_-]+)"
   local pattern = cfg.pattern
   local search_pattern = pattern or base_pattern
   local parse_args = not pattern

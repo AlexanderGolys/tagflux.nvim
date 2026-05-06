@@ -497,7 +497,7 @@ function App:redraw_extmarks(bufnr)
     local intervals = {}
     local cfg_kind = self.tag_kinds.cfg
     if cfg_kind and cfg_kind.get_disabled_intervals then
-        intervals = cfg_kind:get_disabled_intervals(lines, "fluxtags_hl")
+        intervals = cfg_kind:get_disabled_intervals(lines, "ftags-hl")
     end
     local is_disabled = function(lnum, col) return in_intervals(intervals, lnum, col) end
 
@@ -552,7 +552,7 @@ function App:update_tags(silent, bufnr)
     local intervals = {}
     local cfg_kind = self.tag_kinds.cfg
     if not disabled and cfg_kind and cfg_kind.get_disabled_intervals then
-        intervals = cfg_kind:get_disabled_intervals(lines, "fluxtags_reg")
+        intervals = cfg_kind:get_disabled_intervals(lines, "ftags-register")
     end
     local is_disabled = function(lnum, col) return in_intervals(intervals, lnum, col) end
 
