@@ -376,8 +376,9 @@ end
 ---@return table<string, table[]>
 local function merge_ref_links(refs, inline_refs)
     local merged = vim.deepcopy(refs)
+    -- Inline refs should attach to the base mark (e.g. `target.section` -> `target`).
     for name, entries in pairs(inline_refs) do
-        local base = name:match("^([%w_.%-%+%*%/%\\:]+)")
+        local base = name:match("^([^.]+)")
         merged[base] = merged[base] or {}
         for _, entry in ipairs(entries) do
             table.insert(merged[base], {
