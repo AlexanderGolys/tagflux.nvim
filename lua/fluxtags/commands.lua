@@ -65,6 +65,80 @@ local function kind_help()
     return KIND_HELP
 end
 
+---@return string[]
+local function cfg_help_lines()
+    local lines = {}
+    for _, item in ipairs(require("tagkinds.cfg").get_directives_info()) do
+        table.insert(lines, ("- `%s` — %s"):format(item.syntax, item.description))
+    end
+    return lines
+end
+
+---@return string[]
+local function build_help_lines()
+    local lines = {
+        "# Fluxtags Help",
+        "",
+        "## Daily Workflow",
+        "",
+        "1. Add a mark at a stable definition with `@@@name`.",
+        "2. Add refs near callers or notes with `/@@name` or `@name.section`.",
+        "3. Press `<C-]>` on a tag to jump, or run `:FTagsList [kind]` to browse saved tags.",
+        "4. Run `:FTagsUpdate` or save the buffer to persist tagfile changes.",
+        "",
+        "## Tag Types",
+        "",
+    }
+
+    local help = kind_help()
+    for _, kind in ipairs(preview_kinds()) do
+        local item = help[kind]
+        table.insert(lines, ("- `%s` — `%s` — %s"):format(kind, item.syntax, item.info))
+    end
+
+    vim.list_extend(lines, {
+        "",
+        "## Cfg Directives",
+        "",
+    })
+    vim.list_extend(lines, cfg_help_lines())
+
+    vim.list_extend(lines, {
+        "",
+        "## Project And Global Scope",
+        "",
+        "- Register a project with `:FTagsProjectRegister <name> [data|root]`.",
+        "- Ordinary tags in a registered project are saved locally.",
+        "- Prefix a tag with `gg:` to save it globally; the prefix is stripped when loaded.",
+        "- Reference another project with `/@@project_name.tag_name`.",
+        "- Use `$$$ftags-project(name)` to treat one buffer as part of a registered project.",
+        "- Use `$$$ftags-global:on` to save all tags from a buffer globally.",
+        "",
+        "## Troubleshooting",
+        "",
+        "- Run `:set filetype?` if a buffer is parsed as the wrong language.",
+        "- Run `:FTagsHL` to reapply extmarks in the current buffer.",
+        "- Run `:FTagsLoad` if a jump cannot see recently written tagfiles.",
+        "- Run `:FTagsPrune` to remove stale entries for deleted files or moved tags.",
+        "- Run `:FTagsDebugAtCursor` to inspect extmarks under the cursor.",
+    })
+
+    return lines
+end
+
+---@param lines string[]
+local function open_help_panel(lines)
+    vim.cmd("botright new")
+    local bufnr = vim.api.nvim_get_current_buf()
+    vim.bo[bufnr].buftype = "nofile"
+    vim.bo[bufnr].bufhidden = "wipe"
+    vim.bo[bufnr].swapfile = false
+    vim.bo[bufnr].filetype = "markdown"
+    vim.api.nvim_buf_set_name(bufnr, "fluxtags://help")
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    vim.bo[bufnr].modifiable = false
+end
+
 ---@param kind FluxtagsKind|string
 ---@return string
 local function kind_symbol(kind)
@@ -657,6 +731,12 @@ function Commands:_preview(opts)
 end
 
 ---@param self FluxtagsCommands
+---@return nil
+function Commands:_help()
+    open_help_panel(build_help_lines())
+end
+
+---@param self FluxtagsCommands
 ---@param opts vim.api.keyset.user_command
 ---@return nil
 function Commands:_tree(opts)
@@ -795,6 +875,11 @@ function Commands:setup()
             return preview_kinds()
         end,
     })
+    self:_register("FTagsHelp", function()
+        self:_help()
+    end, {
+        desc = "Open fluxtags syntax, cfg, scope, and troubleshooting help",
+    })
     self:_register("FTagsTree", function(opts)
         self:_tree(opts)
     end, {
@@ -837,5 +922,6 @@ end
 
 M._build_tree_lines = build_tree_lines
 M._collect_entries = collect_entries
+M._build_help_lines = build_help_lines
 
 return M

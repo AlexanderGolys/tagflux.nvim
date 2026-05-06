@@ -136,6 +136,13 @@ function M.run()
     helpers.assert_eq("file", picker_entries[1].preview, "picker entry should request file preview")
     helpers.assert_not_nil(picker_entries[1].ordinal, "picker entry should include search text")
 
+    local help_lines = commands._build_help_lines()
+    helpers.assert_true(has_line(help_lines, "Fluxtags Help"), "help should have a title")
+    helpers.assert_true(has_line(help_lines, "Tag Types"), "help should document tag types")
+    helpers.assert_true(has_line(help_lines, "Cfg Directives"), "help should document cfg directives")
+    helpers.assert_true(has_line(help_lines, "Project And Global Scope"), "help should document scoping")
+    helpers.assert_true(has_line(help_lines, "Troubleshooting"), "help should document troubleshooting")
+
     fluxtags.setup({ keymaps = { jump = "g]" } })
     local custom_jump = vim.fn.maparg("g]", "n", false, true)
     helpers.assert_eq("Jump to fluxtag under cursor", custom_jump.desc, "custom jump keymap should be registered")

@@ -276,6 +276,7 @@ require("fluxtags").setup({
 | `:FTagsList [kind]` | Open picker of saved global/project tags with kind, location, and file preview metadata |
 | `:FTagsCfgList` | List cfg directive syntax with descriptions and preview examples |
 | `:FTagsPreview [kind]` | Show tag syntax examples |
+| `:FTagsHelp` | Open a help panel with syntax, cfg directives, scope, and troubleshooting notes |
 | `:FTagsTree [file]` | Generate a project tree of marks and og tags in a temp file or notify output |
 | `:FTagsProjectRegister <name> [data\|root]` | Register current directory for project-local tagfiles |
 | `:FTagsPrune` | Remove stale/deleted tags from all tagfiles |
