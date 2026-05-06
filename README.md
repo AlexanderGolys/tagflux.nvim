@@ -277,6 +277,7 @@ require("fluxtags").setup({
 | `:FTagsCfgList` | List all registered cfg directive keys and descriptions |
 | `:FTagsPreview [kind]` | Show tag syntax examples |
 | `:FTagsTree [file]` | Generate a project tree of marks and og tags in a temp file or notify output |
+| `:FTagsProjectRegister <name> [data\|root]` | Register current directory for project-local tagfiles |
 | `:FTagsPrune` | Remove stale/deleted tags from all tagfiles |
 | `:FTagsClear` | Truncate all saved tagfiles |
 | `:FTagsHL` | Reapply tag extmarks in current buffer |
@@ -284,6 +285,17 @@ require("fluxtags").setup({
 | `:FTagsDebug` | Show matched kind info under cursor |
 | `:FTagsDebugMarks` | Show all fluxtags extmarks in current buffer |
 | `:FTagsDebugAtCursor` | Show extmarks covering cursor position |
+
+---
+
+## Project-Local Tags
+
+Run `:FTagsProjectRegister <name> [data|root]` from a project root to keep ordinary tags in project-local tagfiles. `data` stores them under Neovim's local data directory; `root` stores them under `.fluxtags/tags` in the project.
+
+- Tags such as `@@@parser.init` are saved locally when the current file belongs to a registered project.
+- Tags prefixed with `gg:`, such as `@@@gg:shared.topic`, are saved to the global tagfile and loaded as `shared.topic`.
+- Tags from other registered projects are available as `{project}.tag`, for example `/@@docs.parser.init`.
+- If a local project tag duplicates a global tag, the global tag keeps the unqualified name and the local duplicate is available as `{project}.tag`.
 
 ---
 

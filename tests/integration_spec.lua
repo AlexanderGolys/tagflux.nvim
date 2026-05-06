@@ -217,6 +217,48 @@ function M.run()
     
     local large_tags = mark_kind:collect_tags("/tmp/large.lua", large)
     helpers.assert_len(large_tags, 10, "Should handle large buffer")
+
+    -- Test 11: Project-local storage with gg: global escape
+    print("Test 11: Project-local storage")
+    local project_root = helpers.create_tmpdir()
+    local project_dir = project_root .. "/.fluxtags"
+    vim.fn.mkdir(project_dir, "p")
+    vim.fn.writefile({
+        vim.json.encode({ name = "proj", root = project_root, storage = "root" }),
+    }, project_dir .. "/project.json")
+
+    fluxtags.setup({
+        kinds = {
+            mark = { tagfile = project_root .. "/global-mark.tags" },
+            og = { tagfile = project_root .. "/global-og.tags" },
+        },
+    })
+    mark_kind = fluxtags.tag_kinds.mark
+
+    local project_file = project_root .. "/notes.lua"
+    vim.fn.writefile({
+        "-- @@@local",
+        "-- @@@gg:global",
+        "-- @@@same",
+        "-- @@@gg:same",
+    }, project_file)
+
+    local previous_cwd = vim.loop.cwd()
+    vim.cmd.cd(project_root)
+    local project_lines = vim.fn.readfile(project_file)
+    local project_bufnr = helpers.create_test_buffer(project_lines)
+    vim.api.nvim_buf_set_name(project_bufnr, project_file)
+    fluxtags.update_tags(true, project_bufnr)
+
+    local loaded = fluxtags.load_tagfile("mark")
+    helpers.assert_not_nil(loaded.global, "gg: tags should load without the gg: prefix")
+    helpers.assert_not_nil(loaded["local"], "current project local tag should load unqualified")
+    helpers.assert_not_nil(loaded["proj.local"], "current project local tag should also load with project qualifier")
+    helpers.assert_not_nil(loaded.same, "global duplicate should keep the unqualified name")
+    helpers.assert_not_nil(loaded["proj.same"], "local duplicate should be addressable with project qualifier")
+    helpers.cleanup_buffer(project_bufnr)
+    vim.cmd.cd(previous_cwd)
+    helpers.cleanup_tmpdir(project_root)
     
     helpers.cleanup_tmpdir(tmpdir)
     print("All integration tests passed!")

@@ -63,6 +63,7 @@ All style, formatting, naming, and code-architecture rules live in
 
 - Manual verification: open a file with tags and use plugin commands to jump.
 - Tagfiles are plain text and stored under `stdpath("data")` by default.
+- Registered projects can store ordinary tags locally; `gg:` tag names are saved globally with the prefix stripped.
 - Tag highlighting uses extmarks under the `fluxtags` namespace.
 - Buffer initialization happens on enter and on scheduled refresh.
 - On save, fluxtags reports tagfile changes when present (`+added -removed ~modified`).

@@ -10,6 +10,7 @@
 local config_mod = require("fluxtags_config")
 local Path = require("fluxtags.path")
 local kind_registry = require("fluxtags.kind_registry")
+local Project = require("fluxtags.project")
 
 -- @@@fluxtags
 -- /@@fluxtags.config
@@ -51,6 +52,7 @@ local App = {}
 App.__index = App
 
 local BUILTIN_FILETYPE_EXCLUDES = { oil = true, ["neo-tree"] = true, neotree = true }
+local GLOBAL_TAG_PREFIX = "gg:"
 local path_utils = Path.new()
 
 ---@param list? string[]
@@ -155,6 +157,26 @@ local function format_changes(added, removed, modified)
     if removed > 0 then table.insert(out, ("-%d"):format(removed)) end
     if modified > 0 then table.insert(out, ("~%d"):format(modified)) end
     return out
+end
+
+---@param name string
+---@return boolean
+---@return string
+local function split_global_name(name)
+    if name:sub(1, #GLOBAL_TAG_PREFIX) == GLOBAL_TAG_PREFIX then
+        return true, name:sub(#GLOBAL_TAG_PREFIX + 1)
+    end
+    return false, name
+end
+
+---@param into table<string, table[]>
+---@param name string
+---@param entries table[]
+local function append_entries(into, name, entries)
+    into[name] = into[name] or {}
+    for _, entry in ipairs(entries) do
+        table.insert(into[name], entry)
+    end
 end
 
 ---@return FluxtagsApp
@@ -263,15 +285,18 @@ function App:register_kind(kind)
 end
 
 ---@param kind_name string
+---@param tagfile string
+---@param normalize_name? fun(name:string): string
 ---@return table<string, {file:string, lnum:number, col?:number}[]>
-function App:load_tagfile(kind_name)
-    local kind = self.tag_kinds[kind_name]
-    if not kind or not kind.tagfile or vim.fn.filereadable(kind.tagfile) ~= 1 then return {} end
-
+function App:load_tagfile_path(kind_name, tagfile, normalize_name)
+    if not tagfile or vim.fn.filereadable(tagfile) ~= 1 then return {} end
     local tags = {}
-    for _, line in ipairs(vim.fn.readfile(kind.tagfile)) do
+    for _, line in ipairs(vim.fn.readfile(tagfile)) do
         local name, file, lnum, col = parse_tagfile_line(line)
         if name then
+            if normalize_name then
+                name = normalize_name(name)
+            end
             tags[name] = tags[name] or {}
             local entry = { file = file, lnum = lnum }
             if col then entry.col = col end
@@ -282,18 +307,56 @@ function App:load_tagfile(kind_name)
 end
 
 ---@param kind_name string
+---@return table<string, {file:string, lnum:number, col?:number}[]>
+function App:load_tagfile(kind_name)
+    local kind = self.tag_kinds[kind_name]
+    if not kind then return {} end
+
+    local tags = self:load_tagfile_path(kind_name, kind.tagfile, function(name)
+        local _, stripped = split_global_name(name)
+        return stripped
+    end)
+    local current_project = Project.current(vim.loop.cwd())
+    local projects = Project.all()
+    if current_project then
+        local seen_current = false
+        for _, project in ipairs(projects) do
+            if project.name == current_project.name then
+                seen_current = true
+                break
+            end
+        end
+        if not seen_current then
+            table.insert(projects, current_project)
+        end
+    end
+
+    for _, project in ipairs(projects) do
+        local project_tags = self:load_tagfile_path(kind_name, Project.tagfile(project, kind_name))
+        for name, entries in pairs(project_tags) do
+            append_entries(tags, ("%s.%s"):format(project.name, name), entries)
+            if current_project and project.name == current_project.name and not tags[name] then
+                append_entries(tags, name, entries)
+            end
+        end
+    end
+
+    return tags
+end
+
+---@param kind_name string
+---@param tagfile string
 ---@param filepath string
 ---@param new_tags {name:string, file:string, lnum:number, col?:number}[]
 ---@return {added:integer, removed:integer, modified:integer}
-function App:write_tagfile(kind_name, filepath, new_tags)
-    local kind = self.tag_kinds[kind_name]
-    if not kind or not kind.tagfile then
+function App:write_tagfile_path(kind_name, tagfile, filepath, new_tags)
+    if not tagfile then
         return { added = 0, removed = 0, modified = 0 }
     end
 
     local previous, keep = {}, {}
-    if vim.fn.filereadable(kind.tagfile) == 1 then
-        for _, line in ipairs(vim.fn.readfile(kind.tagfile)) do
+    if vim.fn.filereadable(tagfile) == 1 then
+        for _, line in ipairs(vim.fn.readfile(tagfile)) do
             local name, file, lnum, col = parse_tagfile_line(line)
             if name and file == filepath then
                 previous[name] = previous[name] or {}
@@ -312,8 +375,38 @@ function App:write_tagfile(kind_name, filepath, new_tags)
 
     local added, removed, modified = diff_entries(previous, group_by_name(new_tags))
     table.sort(keep)
-    vim.fn.writefile(keep, kind.tagfile)
+    vim.fn.mkdir(path_utils:dirname(tagfile), "p")
+    vim.fn.writefile(keep, tagfile)
     return { added = added, removed = removed, modified = modified }
+end
+
+---@param kind_name string
+---@param filepath string
+---@param new_tags {name:string, file:string, lnum:number, col?:number}[]
+---@return {added:integer, removed:integer, modified:integer}
+function App:write_tagfile(kind_name, filepath, new_tags)
+    local kind = self.tag_kinds[kind_name]
+    if not kind then
+        return { added = 0, removed = 0, modified = 0 }
+    end
+
+    local project = Project.current(path_utils:dirname(filepath))
+    local global_tags, local_tags = {}, {}
+
+    for _, tag in ipairs(new_tags) do
+        local is_global, name = split_global_name(tag.name)
+        local target = (project and not is_global) and local_tags or global_tags
+        table.insert(target, vim.tbl_extend("force", tag, { name = name }))
+    end
+
+    local total = self:write_tagfile_path(kind_name, kind.tagfile, filepath, global_tags)
+    if project then
+        local local_stats = self:write_tagfile_path(kind_name, Project.tagfile(project, kind_name), filepath, local_tags)
+        total.added = total.added + local_stats.added
+        total.removed = total.removed + local_stats.removed
+        total.modified = total.modified + local_stats.modified
+    end
+    return total
 end
 
 ---@param kind_name string
@@ -563,6 +656,13 @@ function App:run_startup_actions()
     end
 end
 
+---@param name string
+---@param storage? string
+---@return table
+function App:register_project(name, storage)
+    return Project.register(name, storage, vim.loop.cwd())
+end
+
 ---@param opts? Config
 function App:setup(opts)
     self.config = config_mod.setup(opts)
@@ -585,6 +685,14 @@ M.tag_kinds = app.tag_kinds
 ---@return table<string, {file:string, lnum:number, col?:number}[]>
 M.load_tagfile = function(kind_name) return app:load_tagfile(kind_name) end
 
+---@param bufnr integer|table
+---@return boolean
+-- Backward compatible: some callers/tests still use this as a table method.
+M.should_process_buf = function(_maybe_self, bufnr)
+    local target = bufnr == nil and _maybe_self or bufnr
+    return app:should_process_buf(target)
+end
+
 ---@param kind_name string
 ---@return integer
 M.prune_tagfile = function(kind_name) return app:prune_tagfile(kind_name) end
@@ -595,6 +703,11 @@ M.load_tags = function(kind_name) return app:load_tags(kind_name) end
 
 ---@return integer
 M.load_all_tags = function() return app:load_all_tags() end
+
+---@param name string
+---@param storage? string
+---@return table
+M.register_project = function(name, storage) return app:register_project(name, storage) end
 
 ---@param kind TagKind
 ---@return nil

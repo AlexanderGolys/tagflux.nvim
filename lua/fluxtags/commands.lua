@@ -627,6 +627,30 @@ function Commands:_tree(opts)
 end
 
 ---@param self FluxtagsCommands
+---@param opts vim.api.keyset.user_command
+---@return nil
+function Commands:_project_register(opts)
+    local args = vim.split(opts.args or "", "%s+", { trimempty = true })
+    local name = args[1]
+    local storage = args[2] or "data"
+    if not name or name == "" then
+        self:_notify_error("Usage: :FTagsProjectRegister <name> [data|root]")
+        return
+    end
+    if storage ~= "data" and storage ~= "root" then
+        self:_notify_error("Project storage must be 'data' or 'root'")
+        return
+    end
+
+    local ok, project = pcall(self.fluxtags.register_project, name, storage)
+    if not ok then
+        self:_notify_error("Failed to register project: " .. tostring(project))
+        return
+    end
+    self:_notify_info(("Registered fluxtags project %s (%s storage)"):format(project.name, project.storage))
+end
+
+---@param self FluxtagsCommands
 ---@return nil
 function Commands:_clear()
     local cleared = 0
@@ -736,6 +760,19 @@ function Commands:setup()
     end, {
         nargs = "?",
         desc = "Generate project tree of marks and og tags (optional output file path)",
+    })
+    self:_register("FTagsProjectRegister", function(opts)
+        self:_project_register(opts)
+    end, {
+        nargs = "+",
+        desc = "Register current directory as a fluxtags project: <name> [data|root]",
+        complete = function(_, line)
+            local parts = vim.split(line, "%s+", { trimempty = true })
+            if #parts >= 3 then
+                return { "data", "root" }
+            end
+            return {}
+        end,
     })
     self:_register("FTagsClear", function()
         self:_clear()
