@@ -138,6 +138,7 @@ local function pick_static_items(title, items)
         format_item = function(entry)
             return entry.text
         end,
+        preview = "preview",
     }, function() end)
 
     return true
@@ -606,19 +607,29 @@ function Commands:_cfg_list()
 
     local items = {}
     for _, item in ipairs(directives) do
+        local preview = table.concat({
+            item.syntax,
+            "",
+            item.description,
+            "",
+            "Example:",
+            item.example,
+        }, "\n")
         table.insert(items, {
-            text = ("%-16s %s"):format(item.key, item.description),
-            ordinal = item.key,
+            text = ("%-28s %s"):format(item.syntax, item.description),
+            ordinal = table.concat({ item.key, item.syntax, item.description }, " "),
+            preview = preview,
+            hl_group = "FluxTagCfg",
         })
     end
 
-    if pick_static_items("Cfg Directives", items) then
+    if pick_static_items("Fluxtags Cfg Directives", items) then
         return
     end
 
-    local lines = { "Cfg Directives:" }
+    local lines = { "Fluxtags Cfg Directives:", "" }
     for _, item in ipairs(items) do
-        table.insert(lines, "  " .. item.text)
+        table.insert(lines, item.text)
     end
     self:_notify_info(table.concat(lines, "\n"))
 end

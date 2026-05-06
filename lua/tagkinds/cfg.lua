@@ -25,6 +25,8 @@ local M = {}
 ---@class CfgDirectiveSpec
 ---@field key string
 ---@field description string
+---@field syntax string
+---@field example string
 
 local descriptions = {
   ft = "Set the buffer filetype (e.g., ft(lua))",
@@ -33,6 +35,15 @@ local descriptions = {
   fluxtags_hl = "Disable highlighting in regions (e.g., fluxtags_hl(off/on))",
   fluxtags_reg = "Disable tag registration in regions (e.g., fluxtags_reg(off/on))",
   modeline = "Execute an arbitrary Ex command",
+}
+
+local examples = {
+  ft = "```config\n$$$ft(lua)\n```",
+  conceallevel = "```config\n$$$conceallevel(2)\n```",
+  fluxtags = "```config\n$$$fluxtags(off)\n```",
+  fluxtags_hl = "```config\n$$$fluxtags_hl(off)\n...\n$$$fluxtags_hl(on)\n```",
+  fluxtags_reg = "```config\n$$$fluxtags_reg(off)\n...\n$$$fluxtags_reg(on)\n```",
+  modeline = "```config\n$$$modeline(set wrap)\n```",
 }
 
 local handlers = {
@@ -80,6 +91,8 @@ local function registry_info()
     table.insert(directives, {
       key = key,
       description = descriptions[key] or "No description available",
+      syntax = ("$$$%s(<value>)"):format(key),
+      example = examples[key] or ("```config\n$$$%s(value)\n```"):format(key),
     })
   end
   table.sort(directives, function(a, b)

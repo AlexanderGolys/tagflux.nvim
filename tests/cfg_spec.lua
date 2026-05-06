@@ -77,6 +77,15 @@ function M.run()
     cfg_kind.on_enter(bufnr, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
     assert_eq(true, vim.b[bufnr].fluxtags_disabled, "fluxtags(off) should set buffer variable")
     
+
+    -- Test 5: directive list metadata includes syntax and examples for previews.
+    local directives = require("tagkinds.cfg").get_directives_info()
+    local by_key = {}
+    for _, item in ipairs(directives) do
+        by_key[item.key] = item
+    end
+    assert_eq("$$$ft(<value>)", by_key.ft.syntax, "cfg list should expose directive syntax")
+    assert_eq(true, by_key.ft.example:find("$$$ft%(lua%)") ~= nil, "cfg list should expose an example")
     print("All tests passed!")
 end
 
