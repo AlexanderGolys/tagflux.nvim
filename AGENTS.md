@@ -71,6 +71,7 @@ All style, formatting, naming, and code-architecture rules live in
 
 ## Fluxtags Workflow For Coding Agents
 
+- Use the local `$fluxtags-agent-docs` skill when setting up or refreshing agent-facing fluxtags conventions.
 - Use fluxtags to leave lightweight cross-reference anchors in the code you touch, not as general prose notes.
 - Prefer comment-prefixed block tags so the code stays valid in every language.
 - Add `@@@name` marks at stable definitions: public functions, important state transitions, config entry points, parser stages, and other jump targets worth revisiting.
@@ -106,6 +107,7 @@ All style, formatting, naming, and code-architecture rules live in
 - `:FTagsLoad` loads saved tags into memory; `:FTagsPrune` removes stale tags.
 - `:FTagsCfgList` lists all known cfg directive keys.
 - `:FTagsPreview [kind]` shows syntax/usage for all kinds or one selected kind.
+- `:FTagsHelp` opens a help panel; `:FTagsTree` shows project mark/ref and topic/refog relationships.
 
 ## Git Commit Style
 

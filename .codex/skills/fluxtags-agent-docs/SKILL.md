@@ -1,240 +1,156 @@
 ---
 name: fluxtags-agent-docs
-description: Document codebases with fluxtags tags and generate AGENTS.md navigation instructions. Use when setting up fluxtags conventions for a new project or updating agent documentation.
+description: Document codebases with fluxtags tags and AGENTS.md guidance so coding agents create stable navigation graphs across code they write or modify. Use when setting up fluxtags conventions for a project, adding agent-maintained code navigation, or updating agent documentation for fluxtags.
 ---
 
 # Fluxtags Agent Docs
 
-## Overview
+Use this skill to leave a useful fluxtags graph behind while coding, and to teach future agents how to keep that graph coherent.
 
-This skill teaches coding agents how to document codebases using fluxtags and generate clear AGENTS.md prompts that guide future agents to navigate via tags.
+## Goal
 
-## Purpose
+Fluxtags should make a project navigable by concept, not just by filenames. Add tags only where they help another agent answer questions like:
 
-Fluxtags provides lightweight cross-reference anchors for codebases. This skill helps you:
+- Where is this feature defined?
+- Which callers, helpers, and tests depend on it?
+- Which files participate in this cross-cutting concern?
+- Which external docs or local files explain this behavior?
 
-1. Add meaningful tags to code you create or modify
-2. Generate AGENTS.md sections that explain tag usage
-3. Create a navigation mesh that lets future agents jump between related concepts
+Do not use fluxtags as general prose notes or a replacement for normal comments.
 
-## Tag Kinds
+## Core Tags
 
-| Kind | Syntax | Purpose | Persisted |
-|------|--------|---------|-----------|
-| `mark` | `@@@name` | Definition anchor (one per concept) | Yes |
-| `ref` | `/@@name` | Reference to a mark | No |
-| `og` | `@##topic` | Cross-file topic hashtag | Yes |
-| `refog` | `#|#||topic||` | Reference-only link to og topic | No |
-| `bib` | `///<target>` | External link (URL, file, help) | No |
-| `hl` | `==text==` | Inline highlighting | No |
-| `cfg` | `@!<directive>` | Buffer config directive | No |
+| Kind | Syntax | Use |
+|------|--------|-----|
+| mark | `@@@name` | Canonical definition or anchor for one stable concept |
+| ref | `/@@name` | Link from a related location back to a mark |
+| og | `@##topic` | Canonical occurrence of a cross-file theme |
+| refog | `#|#||topic||` | Reference to an existing topic without creating another canonical occurrence |
+| bib | `///<target>` | External URL, vim help topic, or local file pointer |
+| cfg | `$$$directive` | Fluxtags parser behavior control |
 
-## Comment Prefixes
+Avoid `hl` tags unless the work is specifically about fluxtags highlighting.
 
-Fluxtags recognizes block tags with optional comment prefixes:
+## Placement Rules
 
-```
--- @@@commands.list      (Lua)
-# @@@config.entry        (Python, shell)
-// @@@handler.init       (C, C++, JS)
-; @@@macro.expand       (ASM, config
-/* @@@state.parse */     (C block style)
-<!-- @@@component -->     (HTML, XML)
-```
-
-Always use comment-prefixed tags to keep the code syntactically valid.
-
-## Adding Tags While Working
-
-### Definition Anchors (marks)
-
-Add `@@@name` at stable, public locations:
+Prefer comment-prefixed block tags so the host file remains valid:
 
 ```lua
--- @@@picker.render
-local function render(items)
-    ...
+-- @@@commands.list
+local function list_tags(opts)
+  ...
 end
 ```
 
-Place marks at:
-- Public function definitions
-- Important state transitions
-- Config entry points
-- Parser stages
-- Key decision branches
-- Test fixtures that mirror production
-
-### References (refs)
-
-Add `/@@name` near callers and related code:
-
-```lua
--- /@@picker.render
-local result = render(filtered_items)
+```python
+# /@@commands.list
+def test_lists_saved_tags():
+    ...
 ```
 
-Place refs at:
-- Call sites
-- Edge-case handlers
-- Tests exercising a marked definition
-- Helper functions supporting a marked concept
+Supported prefixes include `--`, `#`, `//`, `;`, `/*`, and `<!--`. Use the comment syntax native to the file you are editing.
 
-### Topic Tags (og)
+## Build A Navigation Graph
 
-Add `@##topic` for themes spanning many files:
+1. Add one `@@@name` mark at the best stable definition for each concept worth revisiting.
+2. Add `/@@name` refs near important callers, adapters, edge-case handlers, and tests.
+3. Add `@##topic` when a theme spans multiple files and no single mark is enough.
+4. Add `#|#||topic||` where a file participates in the topic but should not become another canonical occurrence.
+5. Add `///<target>` only when the link materially helps future navigation.
+6. When moving or renaming a concept, update the mark and all nearby refs in the same change.
+
+Good graphs are sparse. A file with many small functions may need only one mark at the public entry point plus refs from tests or integration code.
+
+## Naming
+
+- Prefer repo-specific names: `@@@picker.render`, not `@@@handler`.
+- Use dotted hierarchy when it helps scanning: `@@@config.defaults`, `/@@config.defaults`.
+- Keep one canonical mark per concept.
+- Preserve mark names across refactors when behavior stays the same.
+- Use short lowercase topic names with hyphens: `@##queue-flow`, `@##diagnostics`.
+- Avoid names that describe implementation accidents: `@@@utils`, `@@@new-code`, `@@@temp`.
+
+## Project And Global Scope
+
+Use local project scope for ordinary project tags. Use `gg:` only for anchors that should be shared globally:
 
 ```lua
--- @##parsing
-local tokens = tokenize(input)
-
--- @##diagnostics
-vim.diagnostic.config(opts)
+-- @@@gg:shared.topic
 ```
 
-Use topics for:
-- Architectural concerns (`@##architecture`, `@##data-flow`)
-- Feature families (`@##completion`, `@##highlights`)
-- Cross-cutting concerns (`@##error-handling`, `@##logging`)
-
-### Reference-Only Topics (refog)
-
-Use `#|#||topic||` when pointing at an og without creating a new canonical occurrence:
+Refs can target other registered projects with a project prefix:
 
 ```lua
--- #|#||picker-render-flow||
--- This function participates in the picker render cycle.
+-- /@@docs.parser.init
 ```
 
-Use sparingly - prefer adding refs to marks instead.
+Cfg directives can adjust routing for unusual buffers:
 
-### External Links (bib)
+```config
+$$$ftags-project(notes)
+$$$ftags-global:on
+```
 
-Use `///<target>` for:
-- vim help: `///vim.ui.select`
-- URLs: `///https://neovim.io/doc/user/lua.html`
-- Files: `///~/.config/nvim/init.lua`
+Use routing directives sparingly; most code should rely on the configured project root.
 
-## Naming Conventions
+## AGENTS.md Guidance
 
-### Mark Names
+When adding fluxtags conventions to a repository, add or refresh a concise AGENTS.md section that tells future agents:
 
-- Prefer repo-specific names: `@@@picker.render` over `@@@main`
-- Use dotted hierarchy when helpful: `@@@config.options.validate`
-- One canonical mark per concept; refs point to it from other files
-- Keep names stable across refactors
+- Which files are the main entry points.
+- Which tag names or topic names are already canonical.
+- Which commands verify the tag graph in this project.
+- That agents should update marks and refs together during refactors.
 
-### Topic Names
-
-- Short and thematic: `@##diagnostics` over `@##diagnostic-system`
-- Lowercase with hyphens: `@##data-flow` not `@##DataFlow`
-- One word when possible: `@##queue` over `@##job-queue`
-
-### Anti-Patterns
-
-Avoid:
-- Generic names: `init`, `handler`, `utils`
-- Tagging everything (only tag seams worth revisiting)
-- Unstable names that change during refactors
-
-## AGENTS.md Section Template
-
-When documenting a codebase that uses fluxtags, add a section like:
+Template:
 
 ```markdown
 ## Fluxtags Workflow For Coding Agents
 
-- Use fluxtags to leave lightweight cross-reference anchors in the code you touch,
-  not as general prose notes.
-- Prefer comment-prefixed block tags so the code stays valid.
-- Add `@@@name` marks at stable definitions: public functions, important state
-  transitions, config entry points.
-- Add `/@@name` refs near callers, related helpers, edge-case handling.
-- Use dotted names for hierarchy: `@@@picker.render`, `/@@picker.render`.
-- Use `@##topic` og tags for broader themes: `@##parsing`, `@##diagnostics`.
-- Use `#|#||topic||` to reference og topics without creating another occurrence.
-- Use `///<target>` sparingly for external docs, help, or file paths.
-- Do not add `hl` or `cfg` tags unless the change is about highlighting or config.
-- Keep names stable across refactors; update marks and refs together.
-- Do not tag every function; only tag seams another agent will likely jump between.
-- Before finishing, run `:FTagsUpdate` or `:FTagsSave` during manual verification.
-
-### Recommended Patterns
-
-- Definition anchor: `-- @@@commands.list`
-- Call-site reference: `-- /@@commands.list`
-- Shared concern: `-- @##picker-flow`
-- Reference-only concern: `-- #|#||picker-flow||`
-- External help/doc: `-- ///vim.ui.select`
-
-### Naming Guidelines
-
-- Prefer repo-specific names over generic names like `init`, `handler`, `utils`.
-- One canonical mark per concept; point to it from related files with refs.
-- Keep topic tags short; keep mark names specific and locational.
-- When adding tests, add refs to the production mark they exercise.
+- Use comment-prefixed fluxtags tags in code you touch.
+- Add `@@@name` marks at stable definitions and `/@@name` refs near callers, helpers, and tests.
+- Use dotted names for feature hierarchy, such as `@@@picker.render`.
+- Use `@##topic` for cross-file themes and `#|#||topic||` for reference-only topic links.
+- Use `///<target>` only for useful external docs, help topics, or local file pointers.
+- Do not tag every function; tag concepts another agent will likely need to navigate.
+- Preserve canonical names across refactors and update refs when a mark moves.
+- Before finishing tag changes, run `:FTagsUpdate` or `:FTagsSave` when manual Neovim verification is practical.
 ```
 
-## Navigation Commands
+Keep this section project-specific. Add canonical examples from the repository instead of only generic examples when they exist.
+
+## Verification
+
+After adding or changing tags:
+
+1. Open a touched tagged file in Neovim with fluxtags loaded.
+2. Run `:FTagsUpdate` or `:FTagsSave`.
+3. Run `:FTagsList [kind]` to inspect persisted marks, og topics, and other saved entries.
+4. Run `:FTagsTree` when available to inspect mark/ref and topic/refog relationships.
+5. Use `Ctrl-]` on representative refs and topics to confirm jumps or pickers open correctly.
+6. If cfg syntax changed or is relevant, run `:FTagsCfgList`.
+7. If documenting usage for humans or agents, run `:FTagsHelp` and compare the help text to the instructions you wrote.
+
+If headless or automated verification is all that is practical, run the repository's test command and explicitly state that interactive jump checks were not performed.
+
+## Command Reference
 
 | Command | Purpose |
 |---------|---------|
-| `:FTagsList [kind]` | Open picker for saved tags (filtered by kind) |
-| `:FTagsUpdate` | Persist tags for current buffer |
-| `:FTagsSave` | Same as `:FTagsUpdate` |
+| `:FTagsList [kind]` | Open picker for saved tags, optionally filtered by kind |
+| `:FTagsUpdate` / `:FTagsSave` | Persist tags for the current buffer |
 | `:FTagsLoad` | Load saved tags into memory |
-| `:FTagsPrune` | Remove stale tags |
-| `:FTagsCfgList` | List known cfg directives |
-| `:FTagsPreview [kind]` | Show syntax/usage for a kind |
+| `:FTagsPrune` | Remove stale saved tags |
+| `:FTagsTree` | Show project mark/ref and topic/refog relationships |
+| `:FTagsCfgList` | List cfg directives with descriptions and examples |
+| `:FTagsPreview [kind]` | Show syntax examples for tag kinds |
+| `:FTagsHelp` | Open the complete fluxtags help panel |
 
-## Workflow
+## Review Checklist
 
-### When Creating New Files
-
-1. Add marks at public entry points
-2. Add refs to related existing marks
-3. Add og tags for cross-cutting concerns
-
-### When Modifying Existing Files
-
-1. Find existing marks (search `@@@`)
-2. Keep mark names stable
-3. Add refs near your changes if they relate to existing marks
-4. Add marks only for genuinely new public concepts
-
-### When Refactoring
-
-1. Update the mark location if moving a definition
-2. Update all refs that pointed to the old location
-3. Preserve mark names when possible
-4. Run `:FTagsUpdate` after reorganization
-
-## Checking Your Work
-
-After adding tags:
-
-1. Open a tagged file in Neovim with fluxtags loaded
-2. Run `:FTagsUpdate` to persist tags
-3. Run `:FTagsList` to see saved tags
-4. Verify marks and refs appear correctly
-5. Check that jumping works with `Ctrl-]` on a ref
-
-## Resources
-
-### scripts/
-
-None required - fluxtags is a Neovim plugin.
-
-### references/
-
-None required - all documentation is in this skill.
-
----
-
-## Summary
-
-- Add `@@@name` at definitions, `/@@name` near callers
-- Use `@##topic` for cross-file themes
-- Keep names stable and specific
-- Prefer comment-prefixed tags
-- Run `:FTagsUpdate` before finishing
+- Each new mark has a reason to be a jump target.
+- Important related code has refs instead of duplicate marks.
+- Topic tags describe cross-file concerns, not one-off notes.
+- Names are stable, specific, and consistent with nearby tags.
+- AGENTS.md mentions the project-specific conventions if the project is being set up for agent use.
+- Verification command output or manual checks are recorded in the final response.
