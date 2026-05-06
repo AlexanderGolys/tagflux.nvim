@@ -383,25 +383,32 @@ end
 ---@param kind_name string
 ---@param filepath string
 ---@param new_tags {name:string, file:string, lnum:number, col?:number}[]
+---@param opts? {project_name?:string, global_only?:boolean}
 ---@return {added:integer, removed:integer, modified:integer}
-function App:write_tagfile(kind_name, filepath, new_tags)
+function App:write_tagfile(kind_name, filepath, new_tags, opts)
     local kind = self.tag_kinds[kind_name]
     if not kind then
         return { added = 0, removed = 0, modified = 0 }
     end
 
-    local project = Project.current(path_utils:dirname(filepath))
+    opts = opts or {}
+    local project = opts.project_name and Project.by_name(opts.project_name) or Project.current(path_utils:dirname(filepath))
     local global_tags, local_tags = {}, {}
 
     for _, tag in ipairs(new_tags) do
         local is_global, name = split_global_name(tag.name)
-        local target = (project and not is_global) and local_tags or global_tags
+        local target = (project and not opts.global_only and not is_global) and local_tags or global_tags
         table.insert(target, vim.tbl_extend("force", tag, { name = name }))
     end
 
     local total = self:write_tagfile_path(kind_name, kind.tagfile, filepath, global_tags)
-    if project then
+    if project and not opts.global_only then
         local local_stats = self:write_tagfile_path(kind_name, Project.tagfile(project, kind_name), filepath, local_tags)
+        total.added = total.added + local_stats.added
+        total.removed = total.removed + local_stats.removed
+        total.modified = total.modified + local_stats.modified
+    elseif project and opts.global_only then
+        local local_stats = self:write_tagfile_path(kind_name, Project.tagfile(project, kind_name), filepath, {})
         total.added = total.added + local_stats.added
         total.removed = total.removed + local_stats.removed
         total.modified = total.modified + local_stats.modified
@@ -562,7 +569,10 @@ function App:update_tags(silent, bufnr)
     for kind_name, kind in self:ordered_kinds() do
         if kind.save_to_tagfile then
             local tags = disabled and {} or kind:collect_tags(filepath, lines, is_disabled)
-            local stats = self:write_tagfile(kind_name, filepath, tags)
+            local stats = self:write_tagfile(kind_name, filepath, tags, {
+                project_name = vim.b[bufnr].fluxtags_project,
+                global_only = vim.b[bufnr].fluxtags_global_only,
+            })
             total.added = total.added + stats.added
             total.removed = total.removed + stats.removed
             total.modified = total.modified + stats.modified
@@ -612,6 +622,8 @@ function App:setup_buffer(bufnr, force)
     end
 
     vim.b[bufnr].fluxtags_disabled = false
+    vim.b[bufnr].fluxtags_global_only = false
+    vim.b[bufnr].fluxtags_project = nil
     vim.opt_local.conceallevel = 2
     vim.opt_local.concealcursor = "nc"
 

@@ -33,6 +33,8 @@ local descriptions = {
   conceallevel = "Set conceallevel for this buffer (0-3)",
   ["ftags"] = "Enable or disable all fluxtags processing",
   ["ftags-hl"] = "Enable or disable fluxtags highlighting in a region",
+  ["ftags-global"] = "Save all tags in this buffer to global tagfiles",
+  ["ftags-project"] = "Treat this buffer as part of a registered fluxtags project",
   ["ftags-register"] = "Enable or disable tag registration in a region",
   exec = "Execute an arbitrary Ex command",
   fluxtags = "Disable all fluxtags processing (off)",
@@ -46,6 +48,8 @@ local examples = {
   conceallevel = "```config\n$$$conceallevel(2)\n```",
   ["ftags"] = "```config\n$$$ftags:off\n$$$ftags:on\n```",
   ["ftags-hl"] = "```config\n$$$ftags-hl:off\n...\n$$$ftags-hl:on\n```",
+  ["ftags-global"] = "```config\n$$$ftags-global:on\n```",
+  ["ftags-project"] = "```config\n$$$ftags-project(notes)\n```",
   ["ftags-register"] = "```config\n$$$ftags-register:off\n...\n$$$ftags-register:on\n```",
   exec = "```config\n$$$exec(set wrap)\n```",
   fluxtags = "```config\n$$$fluxtags(off)\n```",
@@ -57,6 +61,8 @@ local examples = {
 local syntax = {
   ["ftags"] = "$$$ftags:<on|off>",
   ["ftags-hl"] = "$$$ftags-hl:<on|off>",
+  ["ftags-global"] = "$$$ftags-global:<on|off>",
+  ["ftags-project"] = "$$$ftags-project(<name>)",
   ["ftags-register"] = "$$$ftags-register:<on|off>",
   exec = "$$$exec(<cmd>)",
 }
@@ -96,6 +102,12 @@ local handlers = {
   fluxtags_hl = function()
   end,
   ["ftags-hl"] = function()
+  end,
+  ["ftags-global"] = function(value, bufnr)
+    vim.b[bufnr].fluxtags_global_only = value == "on"
+  end,
+  ["ftags-project"] = function(value, bufnr)
+    vim.b[bufnr].fluxtags_project = value ~= "" and value or nil
   end,
   fluxtags_reg = function()
   end,

@@ -346,6 +346,8 @@ The built-in directives are:
 - `conceallevel(value)` — set `conceallevel` on windows containing the buffer
 - `ftags:off` / `ftags:on` — disable/enable fluxtags in the buffer
 - `ftags-hl:off` / `ftags-hl:on` — disable/enable fluxtags highlights in regions
+- `ftags-project(name)` — treat this buffer as part of a registered project
+- `ftags-global:on` / `ftags-global:off` — save this buffer's tags to global tagfiles
 - `ftags-register:off` / `ftags-register:on` — disable/enable tag registration in regions
 - `exec(cmd)` — run any Ex command
 

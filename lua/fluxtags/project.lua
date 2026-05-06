@@ -125,6 +125,16 @@ function M.all()
 end
 
 ---@param name string
+---@return table|nil
+function M.by_name(name)
+  for _, project in ipairs(M.all()) do
+    if project.name == name then
+      return project
+    end
+  end
+end
+
+---@param name string
 ---@param storage? string
 ---@param root? string
 ---@return table

@@ -100,6 +100,17 @@ function M.run()
     assert_eq("$$$ft(<value>)", by_key.ft.syntax, "cfg list should expose directive syntax")
     assert_eq(true, by_key.ft.example:find("$$$ft%(lua%)") ~= nil, "cfg list should expose an example")
     assert_eq("$$$ftags:<on|off>", by_key.ftags.syntax, "cfg list should expose colon syntax")
+
+
+    -- Test 6: project/global cfg directives set buffer routing flags.
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+        "$$$ftags-project(notes)",
+        "$$$ftags-global:on",
+    })
+    cfg_kind.on_enter(bufnr, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+    assert_eq("notes", vim.b[bufnr].fluxtags_project, "ftags-project should set project override")
+    assert_eq(true, vim.b[bufnr].fluxtags_global_only, "ftags-global:on should force global writes")
     print("All tests passed!")
 end
 
