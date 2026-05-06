@@ -105,6 +105,37 @@ function M.run()
     helpers.assert_true(has_line(lines, "topics.md:2 -> #|#||alpha"), "tree should list refogs")
     helpers.assert_false(has_line(lines, "@@@outside"), "tree should ignore non-project marks")
 
+    local picker_entries = commands._collect_entries({
+      mark = { save_to_tagfile = true },
+      og = { save_to_tagfile = true },
+      ref = { save_to_tagfile = false },
+    }, function(kind_name)
+      if kind_name == "mark" then
+        return {
+          global = {
+            { file = mark_file, lnum = 1, col = 4 },
+          },
+          ["proj.local"] = {
+            { file = ref_file, lnum = 2, col = 9 },
+          },
+        }
+      end
+      if kind_name == "og" then
+        return {
+          alpha = {
+            { file = topic_file, lnum = 1 },
+          },
+        }
+      end
+      return {}
+    end)
+
+    helpers.assert_len(picker_entries, 3, "picker should include global, local, and topic tags")
+    helpers.assert_true(picker_entries[1].text:find("%[") ~= nil, "picker entry should include kind symbol")
+    helpers.assert_true(picker_entries[1].text:find(":1") ~= nil, "picker entry should include file location")
+    helpers.assert_eq("file", picker_entries[1].preview, "picker entry should request file preview")
+    helpers.assert_not_nil(picker_entries[1].ordinal, "picker entry should include search text")
+
     fluxtags.setup({ keymaps = { jump = "g]" } })
     local custom_jump = vim.fn.maparg("g]", "n", false, true)
     helpers.assert_eq("Jump to fluxtag under cursor", custom_jump.desc, "custom jump keymap should be registered")

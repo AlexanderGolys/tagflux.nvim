@@ -71,6 +71,24 @@ local function kind_symbol(kind)
     return KIND_SYMBOLS[kind] or "?"
 end
 
+---@param path string
+---@param lnum integer
+---@return string
+local function location_label(path, lnum)
+    return ("%s:%d"):format(path_utils:display_relative(path), lnum)
+end
+
+---@param entry table
+---@return string
+local function format_tag_entry(entry)
+    return ("[%s] %-5s %-32s %s"):format(
+        kind_symbol(entry.kind),
+        entry.kind,
+        entry.name,
+        location_label(entry.file, entry.lnum)
+    )
+end
+
 ---@param name string
 ---@param spec string|false|FluxtagsKeymapSpec|nil
 ---@return table|nil
@@ -144,15 +162,25 @@ local function collect_entries(tag_kinds, load_tagfile, kind_filter)
                         pos = { e.lnum, math.max((e.col or 1) - 1, 0) },
                         preview = "file",
                         preview_title = path_utils:display_relative(e.file),
-                        text = ("[%s] %s"):format(kind_symbol(kind_name), name),
+                        ordinal = table.concat({ kind_name, name, e.file, tostring(e.lnum) }, " "),
                     })
+                    entries[#entries].text = format_tag_entry(entries[#entries])
                 end
             end
         end
     end
 
     table.sort(entries, function(a, b)
-        return a.text < b.text
+        if a.kind ~= b.kind then
+            return a.kind < b.kind
+        end
+        if a.name ~= b.name then
+            return a.name < b.name
+        end
+        if a.file ~= b.file then
+            return a.file < b.file
+        end
+        return a.lnum < b.lnum
     end)
     return entries
 end
@@ -168,6 +196,7 @@ local function pick_tag_entries(title, entries, on_confirm)
             format_item = function(entry)
                 return entry.text
             end,
+            preview = "file",
         }, function(choice)
             if choice then
                 on_confirm(choice)
@@ -560,7 +589,7 @@ function Commands:_list_tags(opts)
         return
     end
 
-    local title = kind_filter and ("Tags (" .. kind_filter .. ")") or "Tags"
+    local title = kind_filter and ("Tags: " .. kind_filter) or "Tags: all kinds"
     pick_tag_entries(title, entries, function(entry)
         jump_to_picker_entry(self.fluxtags, self.tag_kinds, entry)
     end)
@@ -796,5 +825,6 @@ function M.setup(fluxtags)
 end
 
 M._build_tree_lines = build_tree_lines
+M._collect_entries = collect_entries
 
 return M

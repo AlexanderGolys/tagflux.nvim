@@ -273,7 +273,7 @@ require("fluxtags").setup({
 | `:FTagsUpdate` | Scan and persist tags from current buffer |
 | `:FTagsSave` | Alias for `:FTagsUpdate` |
 | `:FTagsLoad` | Reload tagfiles into memory |
-| `:FTagsList [kind]` | Open picker of all saved tags with file previews when available |
+| `:FTagsList [kind]` | Open picker of saved global/project tags with kind, location, and file preview metadata |
 | `:FTagsCfgList` | List all registered cfg directive keys and descriptions |
 | `:FTagsPreview [kind]` | Show tag syntax examples |
 | `:FTagsTree [file]` | Generate a project tree of marks and og tags in a temp file or notify output |
