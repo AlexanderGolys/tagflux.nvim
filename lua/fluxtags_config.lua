@@ -82,6 +82,36 @@ M.plugin_defaults = {
 --- @type PluginConfig
 M.options = vim.deepcopy(M.plugin_defaults)
 
+---@param ...
+---@return any|nil
+local function coalesce(...)
+    for i = 1, select("#", ...) do
+        local value = select(i, ...)
+        if value ~= nil then
+            return value
+        end
+    end
+    return nil
+end
+
+---@param cfg PluginConfig
+local function normalize_filetypes(cfg)
+    local include = coalesce(cfg.filetypes_inc, cfg.filetypes_whitelist)
+    local exclude = coalesce(cfg.filetypes_exc, cfg.filetypes_ignore, {})
+
+    cfg.filetypes_inc = include
+    cfg.filetypes_whitelist = include
+    cfg.filetypes_exc = exclude
+    cfg.filetypes_ignore = exclude
+end
+
+---@param startup StartupConfig
+local function normalize_startup_flags(startup)
+    startup.setup_buffer = startup.setup_buffer ~= false
+    startup.update_tags = startup.update_tags == true
+    startup.load_tags = startup.load_tags == true
+end
+
 ---@param kind string
 ---@return string
 ---
@@ -94,12 +124,11 @@ end
 --- Called on load, VimEnter, and ColorScheme to survive theme changes.
 local function link_default_highlights()
     vim.api.nvim_set_hl(0, "FluxTagMarks", { bold = true, fg = "#FF97Aa", nocombine = true })
-    vim.api.nvim_set_hl(0, "FluxTagRef", { italic = true, fg = "#FF9FAF", bold = true })
+    vim.api.nvim_set_hl(0, "FluxTagRef", { italic = true, fg = "#cB80AC", bold = true })
     vim.api.nvim_set_hl(0, "FluxTagOg", { bold = true, fg = "#F9e2af" })
     vim.api.nvim_set_hl(0, "FluxTagRefog", { underline = true, bg = "#FFD946", fg = "#FFF9DC" })
     vim.api.nvim_set_hl(0, "FluxTagCfg", { fg = "#C2F397" })
     vim.api.nvim_set_hl(0, "FluxTagBib", {
-        bg = "#29313E",
         cterm = {
             italic = true
         },
@@ -182,18 +211,12 @@ end
 ---@param cfg PluginConfig
 ---@return PluginConfig
 function M.normalize(cfg)
-    if cfg.filetypes_inc == nil and cfg.filetypes_whitelist ~= nil then
-        cfg.filetypes_inc = cfg.filetypes_whitelist
-    end
-    if cfg.filetypes_exc == nil and cfg.filetypes_ignore ~= nil then
-        cfg.filetypes_exc = cfg.filetypes_ignore
-    end
-
-    cfg.filetypes_whitelist = cfg.filetypes_inc
-    cfg.filetypes_ignore = cfg.filetypes_exc or {}
-    cfg.filetypes_exc = cfg.filetypes_ignore
+    -- Keep backward-compatible aliases while normalizing to canonical fields.
+    normalize_filetypes(cfg)
 
     cfg.startup = cfg.startup or {}
+    normalize_startup_flags(cfg.startup)
+
     if cfg.startup_setup_buffer ~= nil then
         cfg.startup.setup_buffer = cfg.startup_setup_buffer
     end
@@ -204,9 +227,7 @@ function M.normalize(cfg)
         cfg.startup.load_tags = cfg.startup_load_tags
     end
 
-    cfg.startup.setup_buffer = cfg.startup.setup_buffer ~= false
-    cfg.startup.update_tags = cfg.startup.update_tags == true
-    cfg.startup.load_tags = cfg.startup.load_tags == true
+    normalize_startup_flags(cfg.startup)
 
     cfg.startup_setup_buffer = cfg.startup.setup_buffer
     cfg.startup_update_tags = cfg.startup.update_tags

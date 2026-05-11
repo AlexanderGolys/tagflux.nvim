@@ -65,6 +65,22 @@ Builder.__index = Builder
 local DEFAULT_PRIORITY = 1100
 local DEFAULT_TAGFILE_FORMAT = "/fluxtags.%s.tags"
 
+local function default_tagfile_path(kind_name)
+    return vim.fn.stdpath("data") .. DEFAULT_TAGFILE_FORMAT:format(kind_name)
+end
+
+local function default_hl_group(kind_name)
+    return ("FluxTag%s"):format(kind_name:gsub("^%l", string.upper))
+end
+
+local function assign_default_method(tbl, key, normalized, fallback)
+    tbl[key] = normalized[key] or fallback
+end
+
+local function leading_pattern_length(pattern)
+    return #(pattern:match("^(.-)%(") or "")
+end
+
 local OPTION_KEYS = {
     name = true,
     pattern = true,
@@ -308,7 +324,7 @@ function M.new(opts)
     local self = setmetatable({}, TagKind)
     self.name = normalized.name
     self.pattern = normalized.pattern
-    self.hl_group = normalized.hl_group or ("FluxTag" .. normalized.name:gsub("^%l", string.upper))
+    self.hl_group = normalized.hl_group or default_hl_group(normalized.name)
     self.conceal_pattern = normalized.conceal_pattern
     self.save_to_tagfile = normalized.save_to_tagfile
     self.priority = normalized.priority or DEFAULT_PRIORITY
@@ -319,14 +335,14 @@ function M.new(opts)
 
     if self.save_to_tagfile then
         self.tagfile = normalized.tagfile
-            or (vim.fn.stdpath("data") .. DEFAULT_TAGFILE_FORMAT:format(self.name))
+            or default_tagfile_path(self.name)
     end
 
-    self.apply_extmarks = normalized.apply_extmarks or TagKind.apply_extmarks
-    self.apply_diagnostics = normalized.apply_diagnostics or TagKind.apply_diagnostics
-    self.collect_tags = normalized.collect_tags or TagKind.collect_tags
-    self.find_at_cursor = normalized.find_at_cursor or TagKind.find_at_cursor
-    self.get_disabled_intervals = normalized.get_disabled_intervals or TagKind.get_disabled_intervals
+    assign_default_method(self, "apply_extmarks", normalized, TagKind.apply_extmarks)
+    assign_default_method(self, "apply_diagnostics", normalized, TagKind.apply_diagnostics)
+    assign_default_method(self, "collect_tags", normalized, TagKind.collect_tags)
+    assign_default_method(self, "find_at_cursor", normalized, TagKind.find_at_cursor)
+    assign_default_method(self, "get_disabled_intervals", normalized, TagKind.get_disabled_intervals)
 
     return self
 end
@@ -392,7 +408,7 @@ function TagKind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
                     end
                 end
             else
-                local prefix_len = #(self.pattern:match("^(.-)%(") or "")
+                local prefix_len = leading_pattern_length(self.pattern)
                 local seg_end = col0 + prefix_len + #capture
                 if seg_end >= col0 then
                     Extmark.place(bufnr, ns, lnum, col0, {

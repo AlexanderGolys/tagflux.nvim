@@ -181,8 +181,9 @@ end
 ---@param line string
 ---@param search_pattern string
 ---@param parse_args boolean
+---@param ignored_ranges? table[]
 ---@return CfgDirective[]
-local function parse_cfg_line(line, search_pattern, parse_args)
+local function parse_cfg_line(line, search_pattern, parse_args, ignored_ranges)
   local directives = {}
   local search_from = 1
 
@@ -192,32 +193,127 @@ local function parse_cfg_line(line, search_pattern, parse_args)
       break
     end
 
-    local value, tag_end = "", e
-    if parse_args then
-      local args = line:sub(e + 1):match("^%b()")
-      if args then
-        value = args:sub(2, -2)
-        tag_end = e + #args
-      else
-        local colon_value = line:sub(e + 1):match("^:([%w_-]+)")
-        if colon_value then
-          value = colon_value
-          tag_end = e + #colon_value + 1
-        end
+    local is_ignored = false
+    for _, range in ipairs(ignored_ranges or {}) do
+      if s >= range[1] and s <= range[2] then
+        is_ignored = true
+        break
       end
     end
-    table.insert(directives, {
-      s = s,
-      e = e,
-      key = key,
-      value = value,
-      tag_end = tag_end,
-    })
+    if not is_ignored then
+      local value, tag_end = "", e
+      if parse_args then
+        local args = line:sub(e + 1):match("^%b()")
+        if args then
+          value = args:sub(2, -2)
+          tag_end = e + #args
+        else
+          local colon_value = line:sub(e + 1):match("^:([%w_-]+)")
+          if colon_value then
+            value = colon_value
+            tag_end = e + #colon_value + 1
+          end
+        end
+      end
+      table.insert(directives, {
+        s = s,
+        e = e,
+        key = key,
+        value = value,
+        tag_end = tag_end,
+      })
+    end
 
     search_from = e + 1
   end
 
   return directives
+end
+
+---@param line string
+---@return boolean
+local function is_markdown_fence(line)
+  return line:match("^%s*```") ~= nil or line:match("^%s*~~~") ~= nil
+end
+
+---@param bufnr number
+---@return boolean
+local function is_markdown_buf(bufnr)
+  return vim.bo[bufnr].filetype:match("markdown") ~= nil
+end
+
+---@param line string
+---@return table[]
+local function markdown_inline_code_ranges(line)
+  local ranges = {}
+  local search_from = 1
+  while true do
+    local s, e = line:find("`", search_from, true)
+    if not s then
+      break
+    end
+    local close_s, close_e = line:find("`", e + 1, true)
+    if not close_s then
+      break
+    end
+    table.insert(ranges, { s, close_e })
+    search_from = close_e + 1
+  end
+  return ranges
+end
+
+---@param bufnr number
+---@param lines string[]
+---@return table<integer, boolean>
+local function markdown_fenced_lines(bufnr, lines)
+  local fenced = {}
+  if not is_markdown_buf(bufnr) then
+    return fenced
+  end
+
+  local in_fence = false
+  for lnum0, line in ipairs(lines) do
+    if is_markdown_fence(line) then
+      fenced[lnum0] = true
+      in_fence = not in_fence
+    elseif in_fence then
+      fenced[lnum0] = true
+    end
+  end
+  return fenced
+end
+
+---@param bufnr number
+---@param lnum number
+---@return boolean
+local function is_markdown_fenced_lnum(bufnr, lnum)
+  if not is_markdown_buf(bufnr) then
+    return false
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, lnum + 1, false)
+  local fenced = markdown_fenced_lines(bufnr, lines)
+  return fenced[lnum + 1] == true
+end
+
+---@param bufnr number
+---@param lines string[]
+---@param parse_line fun(line:string, ignored_ranges?:table[]): CfgDirective[]
+---@return table<integer, CfgDirective[]>
+local function parse_cfg_lines_for_buf(bufnr, lines, parse_line)
+  local parsed = {}
+  local fenced = markdown_fenced_lines(bufnr, lines)
+
+  for lnum0, line in ipairs(lines) do
+    if fenced[lnum0] then
+      parsed[lnum0] = {}
+    else
+      local ignored_ranges = is_markdown_buf(bufnr) and markdown_inline_code_ranges(line) or nil
+      parsed[lnum0] = parse_line(line, ignored_ranges)
+    end
+  end
+
+  return parsed
 end
 
 ---@param lines string[]
@@ -298,9 +394,10 @@ function M.register(fluxtags)
   local cfg_diag_ns = fluxtags.utils.make_diag_ns("cfg")
 
   ---@param line string
+  ---@param ignored_ranges? table[]
   ---@return CfgDirective[]
-  local function parse_line(line)
-    return parse_cfg_line(line, search_pattern, parse_args)
+  local function parse_line(line, ignored_ranges)
+    return parse_cfg_line(line, search_pattern, parse_args, ignored_ranges)
   end
 
   local kind = tag_kind.builder({
@@ -316,8 +413,9 @@ function M.register(fluxtags)
       return false
     end,
   }):with_on_enter(function(bufnr, lines)
-    for _, line in ipairs(lines) do
-      for _, item in ipairs(parse_line(line)) do
+    local parsed = parse_cfg_lines_for_buf(bufnr, lines, parse_line)
+    for _, items in ipairs(parsed) do
+      for _, item in ipairs(items) do
         local ok, err = registry_exec(item.key, item.value, bufnr)
         if not ok and err and err ~= "unknown handler" then
           vim.notify("fluxtags cfg: " .. item.key .. ": " .. err, vim.log.levels.WARN)
@@ -329,8 +427,12 @@ function M.register(fluxtags)
   function kind:apply_extmarks(bufnr, lnum, line, ns, is_disabled)
     local priority = self.priority or 1100
     local conceal_char = cfg.conceal_open or open:sub(1, 1)
+    if is_markdown_fenced_lnum(bufnr, lnum) then
+      return
+    end
 
-    for _, item in ipairs(parse_line(line)) do
+    local ignored_ranges = is_markdown_buf(bufnr) and markdown_inline_code_ranges(line) or nil
+    for _, item in ipairs(parse_line(line, ignored_ranges)) do
       local prefix_start, prefix_text = prefix_util.find_prefix(line, item.s, prefix_patterns)
       local col0 = prefix_start - 1
       local open_len = #prefix_text + #open
@@ -354,9 +456,10 @@ function M.register(fluxtags)
   function kind:apply_diagnostics(bufnr, lines, is_disabled)
     local diags = {}
     local priority = (self.priority or 1100) + 10
+    local parsed = parse_cfg_lines_for_buf(bufnr, lines, parse_line)
 
     for lnum0, line in ipairs(lines) do
-      for _, item in ipairs(parse_line(line)) do
+      for _, item in ipairs(parsed[lnum0] or {}) do
         local prefix_start, prefix_text = prefix_util.find_prefix(line, item.s, prefix_patterns)
         local col0 = prefix_start - 1
         if not (is_disabled and is_disabled(lnum0 - 1, col0)) and not registry_has(item.key) then

@@ -19,12 +19,12 @@ local M = {}
 ---@param line string
 ---@param cb fun(col0: number, ref: string)
 local function for_each_inline_ref(line, cb)
-    for match_start, ref in line:gmatch("() @([%w_.%-%+%*%/%\\:]+%.[%w_.%-%+%*%/%\\:]+)") do
+    for match_start, ref in line:gmatch("()/@@([%w_.%-%+%*%/%\\:]+%.[%w_.%-%+%*%/%\\:]+)") do
         cb(tonumber(match_start) - 1, ref)
     end
 end
 
---- Register the `ref` tag kind with the app.
+--- Register the `ref` tag kind with the app. 
 ---
 --- Supports both:
 --- - block refs: `/@@name`
@@ -43,7 +43,7 @@ function M.register(fluxtags)
         pattern = " /@@([%w_.%-%+%*%/%\\:]+)",
         hl_group = "FluxTagRef",
         open = " /@@",
-        conceal_open = "@",
+        conceal_open = " @",
         priority = 1100,
     })
     local kind_cfg = binder.cfg

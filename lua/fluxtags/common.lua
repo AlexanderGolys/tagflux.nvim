@@ -1,7 +1,7 @@
 local M = {}
 
 M.NAME_CHARS = "[%w_.%-%+%*%/%\\:]+"
-M.INLINE_SUBTAG_PATTERN = " @(" .. M.NAME_CHARS .. "%." .. M.NAME_CHARS .. ")"
+M.INLINE_SUBTAG_PATTERN = "@(" .. M.NAME_CHARS .. "%." .. M.NAME_CHARS .. ")"
 
 ---@param name string
 ---@return boolean
@@ -18,11 +18,8 @@ end
 ---
 function M.resolve_kind_config(fluxtags, kind_name, defaults, default_prefix_patterns)
     local cfg = (fluxtags.config.kinds and fluxtags.config.kinds[kind_name]) or {}
-    local resolved = vim.deepcopy(defaults)
-
-    for key, value in pairs(cfg) do
-        resolved[key] = value
-    end
+    -- Keep the merge order explicit: runtime config overrides default kind options.
+    local resolved = vim.tbl_deep_extend("force", vim.deepcopy(defaults), cfg)
 
     if default_prefix_patterns then
         resolved.comment_prefix_patterns = cfg.comment_prefix_patterns or default_prefix_patterns
@@ -36,6 +33,7 @@ end
 ---@return string
 ---
 function M.derive_open(pattern, fallback)
+    -- Pull the literal marker prefix from the pattern (for "/@@...").
     return pattern:match("^(.-)%(%S%+%)") or fallback
 end
 

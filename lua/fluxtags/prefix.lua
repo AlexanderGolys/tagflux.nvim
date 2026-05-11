@@ -10,15 +10,14 @@ M.default_comment_prefix_patterns = {
     "<!%-%-%s*",
 }
 
---- Find a comment-like prefix that ends immediately before `marker_start`.
---- Returns the 1-indexed start of the prefix and the matched prefix text.
---- When no prefix matches, returns `marker_start` and an empty string.
+--- Return the start/end for a comment-like prefix right before `marker_start`.
+--- Returns `marker_start` and an empty prefix when no prefix is found.
 ---
---- @param line string
---- @param marker_start number
---- @param prefix_patterns? string[]
---- @return number
---- @return string
+---@param line string
+---@param marker_start number
+---@param prefix_patterns? string[]
+---@return number
+---@return string
 function M.find_prefix(line, marker_start, prefix_patterns)
     local patterns = prefix_patterns or M.default_comment_prefix_patterns
     local before = line:sub(1, marker_start - 1)
@@ -36,13 +35,32 @@ function M.find_prefix(line, marker_start, prefix_patterns)
     if best_s and best_e then
         return best_s, before:sub(best_s, best_e)
     end
-
     return marker_start, ""
 end
 
+local function find_match_at_cursor(line, col, pattern, prefix_patterns)
+    local function matches_column(col, start_col, end_col)
+        return col >= start_col and col <= end_col
+    end
+
+    local search_from = 1
+    while true do
+        local s, e, capture = line:find(pattern, search_from)
+        if not s then
+            return nil
+        end
+
+        local prefix_start = prefix_patterns and M.find_prefix(line, s, prefix_patterns) or s
+        if matches_column(col, prefix_start, e) then
+            return capture, prefix_start, e
+        end
+
+        search_from = e + 1
+    end
+end
+
 --- Find a pattern match that overlaps `col`, accounting for optional comment prefixes.
---- Returns the first capture, the prefix-aware start column, and end column (all 1-indexed).
---- Returns nil when no match covers the cursor.
+--- Returns the first capture, the prefix-aware start column, and end column.
 ---
 ---@param line string
 ---@param col number
@@ -52,25 +70,10 @@ end
 ---@return number|nil
 ---@return number|nil
 function M.find_tag_at_cursor(line, col, pattern, prefix_patterns)
-    local search_from = 1
-    while true do
-        local s, e, capture = line:find(pattern, search_from)
-        if not s then
-            return nil
-        end
-
-        local prefix_start = M.find_prefix(line, s, prefix_patterns)
-        if col >= prefix_start and col <= e then
-            return capture, prefix_start, e
-        end
-
-        search_from = e + 1
-    end
+    return find_match_at_cursor(line, col, pattern, prefix_patterns)
 end
 
 --- Find a pattern match that overlaps `col` without prefix handling.
---- Returns the first capture, start column, and end column (all 1-indexed).
---- Returns nil when no match covers the cursor.
 ---
 ---@param line string
 ---@param col number
@@ -79,19 +82,7 @@ end
 ---@return number|nil
 ---@return number|nil
 function M.find_match_at_cursor(line, col, pattern)
-    local search_from = 1
-    while true do
-        local s, e, capture = line:find(pattern, search_from)
-        if not s then
-            return nil
-        end
-
-        if col >= s and col <= e then
-            return capture, s, e
-        end
-
-        search_from = e + 1
-    end
+    return find_match_at_cursor(line, col, pattern)
 end
 
 --- Apply a common extmark layout for prefixed tags:

@@ -16,6 +16,9 @@ local M = {}
 function M.setup(fluxtags, schedule_refresh)
     local _config = require("fluxtags_config")
     local augroup = vim.api.nvim_create_augroup("Fluxtags", { clear = true })
+    local function on_buf_arg(args)
+        schedule_refresh(args.buf)
+    end
 
     -- Re-link highlight groups after any colorscheme change so FluxTag* groups
     -- survive theme switching.
@@ -42,13 +45,13 @@ function M.setup(fluxtags, schedule_refresh)
     -- Initialize extmarks and on_enter hooks whenever a buffer comes into view.
     vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
         group    = augroup,
-        callback = function(args) schedule_refresh(args.buf) end,
+        callback = on_buf_arg,
     })
 
     -- Re-apply extmarks while editing so highlights stay in sync with edits.
     vim.api.nvim_create_autocmd({ "ModeChanged" }, {
     group    = augroup,
-        callback = function(args) schedule_refresh(args.buf) end,
+        callback = on_buf_arg,
     })
 
     -- Persist tags to tagfiles whenever the buffer is written.

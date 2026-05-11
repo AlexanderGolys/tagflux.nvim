@@ -1,10 +1,10 @@
-<F13># fluxtags.nvim
+# fluxtags nvim
 
 A lightweight tagging system for Neovim that lets you create marks, references, links, and hashtags across your files with seamless navigation.
 
 ## Features
 
-- **7 tag types** — mark, ref, refog, bib, og, hl, and cfg
+-  **7 tag types** — mark, ref, refog, bib, og, hl, and cfg
 - **Cross-file navigation** — jump between tags using Ctrl-]
 - **Smart picker** — when a tag has multiple locations, choose which one to visit
 - **Parent tag resolution** — `@config.defaults` automatically resolves to `@config`
@@ -101,12 +101,11 @@ end
 A named location you can jump to from anywhere in your project.
 
 ```config
--- @@@init
+
 function init()
   print("initialized")
 end
 
--- @@@config
 local config = { ... }
 ```
 
@@ -121,8 +120,6 @@ Points to a mark. Two forms:
 - Inline: `@mymark.details`
 
 ```config
--- /@@init           -- block form
-local init_fn = @init.function  -- inline form
 ```
 
 **Jump behavior:** Ctrl-] on a reference jumps to the mark it points to.

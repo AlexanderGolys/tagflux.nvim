@@ -65,7 +65,6 @@ function M.run()
         {0, 19, 1, 0},
         {2, 19, 3, 0},
     }, hl_intervals, "multiple hl intervals")
-    
 
     -- Test 3b: new colon-style cfg directives
     lines = {
@@ -78,7 +77,7 @@ function M.run()
     assert_deep_eq({{0, 15, 2, 0}}, hl_intervals, "ftags-hl colon interval")
     reg_intervals = cfg_kind:get_disabled_intervals(lines, "ftags-register")
     assert_deep_eq({{3, 21, math.huge, math.huge}}, reg_intervals, "ftags-register colon interval")
-
+    
     -- Test 4: Buffer wide disabled flag
     local bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
@@ -89,9 +88,33 @@ function M.run()
     -- Simulate on_enter to trigger the ftags:off handler
     cfg_kind.on_enter(bufnr, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
     assert_eq(true, vim.b[bufnr].fluxtags_disabled, "ftags:off should set buffer variable")
-    
 
-    -- Test 5: directive list metadata includes syntax and examples for previews.
+    -- Test 5: Markdown examples should not execute cfg directives.
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.bo[bufnr].filetype = "markdown"
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+        "Inline example `$$$ft(lua)` should stay inert.",
+        "```config",
+        "$$$ft(lua)",
+        "$$$fluxtags(off)",
+        "```",
+    })
+
+    cfg_kind.on_enter(bufnr, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+    assert_eq("markdown", vim.bo[bufnr].filetype, "markdown inline/fenced cfg examples should not change filetype")
+    assert_eq(nil, vim.b[bufnr].fluxtags_disabled, "markdown fenced cfg examples should not disable fluxtags")
+
+    -- Test 6: Standalone Markdown cfg directives still execute outside code spans.
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.bo[bufnr].filetype = "markdown"
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+        "$$$ft(lua)",
+    })
+
+    cfg_kind.on_enter(bufnr, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+    assert_eq("lua", vim.bo[bufnr].filetype, "standalone markdown cfg directive should execute")
+
+    -- Test 7: directive list metadata includes syntax and examples for previews.
     local directives = require("tagkinds.cfg").get_directives_info()
     local by_key = {}
     for _, item in ipairs(directives) do
@@ -101,8 +124,7 @@ function M.run()
     assert_eq(true, by_key.ft.example:find("$$$ft%(lua%)") ~= nil, "cfg list should expose an example")
     assert_eq("$$$ftags:<on|off>", by_key.ftags.syntax, "cfg list should expose colon syntax")
 
-
-    -- Test 6: project/global cfg directives set buffer routing flags.
+    -- Test 8: project/global cfg directives set buffer routing flags.
     bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
         "$$$ftags-project(notes)",
@@ -111,6 +133,7 @@ function M.run()
     cfg_kind.on_enter(bufnr, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
     assert_eq("notes", vim.b[bufnr].fluxtags_project, "ftags-project should set project override")
     assert_eq(true, vim.b[bufnr].fluxtags_global_only, "ftags-global:on should force global writes")
+    
     print("All tests passed!")
 end
 

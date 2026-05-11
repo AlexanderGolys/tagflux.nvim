@@ -55,13 +55,23 @@ local BUILTIN_FILETYPE_EXCLUDES = { oil = true, ["neo-tree"] = true, neotree = t
 local GLOBAL_TAG_PREFIX = "gg:"
 local path_utils = Path.new()
 
----@param list? string[]
----@param value string
----@return boolean
-local function in_list(list, value)
-    if not list then return false end
-    for _, v in ipairs(list) do
-        if v == value then return true end
+local function is_window_floating(winid)
+    if not vim.api.nvim_win_is_valid(winid) then
+        return true
+    end
+    local cfg = vim.api.nvim_win_get_config(winid)
+    return cfg.relative ~= nil and cfg.relative ~= ""
+end
+
+local function has_non_floating_window(bufnr)
+    local wins = vim.fn.win_findbuf(bufnr)
+    if #wins == 0 then
+        return true
+    end
+    for _, winid in ipairs(wins) do
+        if not is_window_floating(winid) then
+            return true
+        end
     end
     return false
 end
@@ -220,6 +230,7 @@ end
 
 ---@param bufnr integer
 ---@return boolean
+-- /@@fluxtags.should_process_buf
 function App:should_process_buf(bufnr)
     if not vim.api.nvim_buf_is_valid(bufnr) then
         return false
@@ -233,21 +244,8 @@ function App:should_process_buf(bufnr)
         return false
     end
 
-    local wins = vim.fn.win_findbuf(bufnr)
-    if #wins > 0 then
-        local has_non_float = false
-        for _, winid in ipairs(wins) do
-            if vim.api.nvim_win_is_valid(winid) then
-                local cfg = vim.api.nvim_win_get_config(winid)
-                if cfg.relative == nil or cfg.relative == "" then
-                    has_non_float = true
-                    break
-                end
-            end
-        end
-        if not has_non_float then
-            return false
-        end
+    if not has_non_floating_window(bufnr) then
+        return false
     end
 
     local curwin = vim.api.nvim_get_current_win()
@@ -258,11 +256,15 @@ function App:should_process_buf(bufnr)
         end
     end
 
-    if ft == "" then return true end
+    if ft == "" then
+        return true
+    end
     local deny = self.config.filetypes_exc or self.config.filetypes_ignore
-    if in_list(deny, ft) then return false end
+    if vim.tbl_contains(deny or {}, ft) then
+        return false
+    end
     local allow = self.config.filetypes_inc or self.config.filetypes_whitelist
-    return allow == nil or #allow == 0 or in_list(allow, ft)
+    return allow == nil or #allow == 0 or vim.tbl_contains(allow, ft)
 end
 
 ---@param kind TagKind

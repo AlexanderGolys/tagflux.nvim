@@ -32,11 +32,7 @@ local DEFAULT_KEYMAPS = {
 
 local active_keymaps = {}
 
----@return table|nil
 local function snacks_picker()
-    if _G.Snacks and _G.Snacks.picker then
-        return _G.Snacks.picker
-    end
     local ok_snacks, snacks = pcall(require, "snacks")
     if ok_snacks and snacks and snacks.picker then
         return snacks.picker
@@ -198,6 +194,21 @@ local function resolve_keymap_spec(name, spec)
     return merged
 end
 
+-- Build the list of saveable tag kinds for command completion.
+--
+-- @param self FluxtagsCommands
+-- @return table
+local function pickable_kinds(self)
+    local kinds = {}
+    for name, kind in pairs(self.tag_kinds) do
+        if kind.save_to_tagfile then
+            table.insert(kinds, name)
+        end
+    end
+    table.sort(kinds)
+    return kinds
+end
+
 ---@param title string
 ---@param items {text:string, ordinal?:string}[]
 ---@return boolean
@@ -207,13 +218,16 @@ local function pick_static_items(title, items)
         return false
     end
 
+    local noop = function()
+    end
+
     picker.select(items, {
         title = title,
         format_item = function(entry)
             return entry.text
         end,
         preview = "preview",
-    }, function() end)
+    }, noop)
 
     return true
 end
@@ -228,7 +242,7 @@ local function collect_entries(tag_kinds, load_tagfile, kind_filter)
         if kind.save_to_tagfile and (not kind_filter or kind_name == kind_filter) then
             for name, tag_entries in pairs(load_tagfile(kind_name)) do
                 for _, e in ipairs(tag_entries) do
-                    table.insert(entries, {
+                    local entry = {
                         kind = kind_name,
                         name = name,
                         file = e.file,
@@ -238,8 +252,9 @@ local function collect_entries(tag_kinds, load_tagfile, kind_filter)
                         preview = "file",
                         preview_title = path_utils:display_relative(e.file),
                         ordinal = table.concat({ kind_name, name, e.file, tostring(e.lnum) }, " "),
-                    })
-                    entries[#entries].text = format_tag_entry(entries[#entries])
+                    }
+                    entry.text = format_tag_entry(entry)
+                    table.insert(entries, entry)
                 end
             end
         end
@@ -265,6 +280,12 @@ end
 ---@param on_confirm fun(entry: table)
 local function pick_tag_entries(title, entries, on_confirm)
     local picker = snacks_picker()
+    local invoke = function(choice)
+        if choice then
+            on_confirm(choice)
+        end
+    end
+
     if picker and picker.select then
         picker.select(entries, {
             title = title,
@@ -272,11 +293,7 @@ local function pick_tag_entries(title, entries, on_confirm)
                 return entry.text
             end,
             preview = "file",
-        }, function(choice)
-            if choice then
-                on_confirm(choice)
-            end
-        end)
+        }, invoke)
         return
     end
 
@@ -285,11 +302,7 @@ local function pick_tag_entries(title, entries, on_confirm)
         format_item = function(entry)
             return entry.text
         end,
-    }, function(choice)
-        if choice then
-            on_confirm(choice)
-        end
-    end)
+    }, invoke)
 end
 
 ---@param fluxtags table
@@ -600,14 +613,7 @@ end
 ---@param self FluxtagsCommands
 ---@return table
 function Commands:_pickable_kinds()
-    local kinds = {}
-    for name, kind in pairs(self.tag_kinds) do
-        if kind.save_to_tagfile then
-            table.insert(kinds, name)
-        end
-    end
-    table.sort(kinds)
-    return kinds
+    return pickable_kinds(self)
 end
 
 ---@param self FluxtagsCommands
